@@ -1,0 +1,11 @@
+<phpunit
+	bootstrap="tests/phpunit/bootstrap.php"
+	backupGlobals="false"
+	colors="true"
+	>
+	<testsuites>
+		<testsuite name="RSS Chat Routing">
+			<directory prefix="class-test-" suffix=".php">./tests/phpunit/tests</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>
