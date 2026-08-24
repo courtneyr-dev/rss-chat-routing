@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       RSS Chat Routing
  * Plugin URI:        https://github.com/courtneyr-dev/rss-chat-routing
- * Description:       Choose which posts go to rss.chat by Post Kind, by a site-wide default, or per post, without making the chat post format do the routing.
- * Version:           0.1.0
+ * Description:       Choose which posts go to rss.chat by default post format, default Post Kind, or per post — and bring replies home as verified Webmentions.
+ * Version:           0.2.0
  * Requires at least: 6.6
  * Requires PHP:      7.4
  * Author:            Courtney Robertson
@@ -21,11 +21,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const FILE    = __FILE__;
 
 require_once __DIR__ . '/includes/class-rules.php';
 require_once __DIR__ . '/includes/class-router.php';
+require_once __DIR__ . '/includes/class-link-shim.php';
+require_once __DIR__ . '/includes/class-comment-gate.php';
+require_once __DIR__ . '/includes/class-reply-import.php';
+require_once __DIR__ . '/includes/class-micropub.php';
 require_once __DIR__ . '/includes/class-settings.php';
 require_once __DIR__ . '/includes/class-editor.php';
 
@@ -37,6 +41,7 @@ require_once __DIR__ . '/includes/class-editor.php';
 function bootstrap() {
 	Rules::init();
 	Settings::init();
+	Micropub::init();
 
 	if ( ! is_parent_active() ) {
 		\add_action( 'admin_notices', __NAMESPACE__ . '\\parent_missing_notice' );
@@ -44,6 +49,10 @@ function bootstrap() {
 	}
 
 	Router::init();
+	Link_Shim::init();
+	Comment_Gate::init();
+	Reply_Import::init();
+	Micropub::init_push();
 	Editor::init();
 }
 \add_action( 'plugins_loaded', __NAMESPACE__ . '\\bootstrap', 20 );

@@ -1,0 +1,20 @@
+{
+	"core": null,
+	"plugins": [
+		"../../../../wordpress-rss-chat",
+		"../../..",
+		"https://downloads.wordpress.org/plugin/webmention.zip",
+		"https://downloads.wordpress.org/plugin/activitypub.zip",
+		"https://downloads.wordpress.org/plugin/indieweb.zip",
+		"https://downloads.wordpress.org/plugin/atmosphere.zip",
+		"https://downloads.wordpress.org/plugin/indieauth.zip",
+		"https://downloads.wordpress.org/plugin/micropub.zip",
+		"../../../../post-formats-for-block-themes",
+		"../../../../post-kinds-for-indieweb"
+	],
+	"port": 8892,
+	"testsPort": 8893,
+	"mappings": {
+		"wp-content/mu-plugins/e2e-helpers.php": "../mu/e2e-helpers.php"
+	}
+}

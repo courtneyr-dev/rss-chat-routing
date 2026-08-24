@@ -1,0 +1,13 @@
+{
+ "core": null,
+ "plugins": [
+  "../../../wordpress-rss-chat",
+  "../..",
+  "https://downloads.wordpress.org/plugin/webmention.zip"
+ ],
+ "port": 8890,
+ "testsPort": 8891,
+ "mappings": {
+  "wp-content/mu-plugins/e2e-helpers.php": "./mu/e2e-helpers.php"
+ }
+}

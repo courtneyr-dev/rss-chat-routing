@@ -43,7 +43,7 @@ class Editor {
 		\wp_enqueue_script(
 			$handle,
 			\plugins_url( 'assets/js/editor.js', FILE ),
-			array( 'wp-plugins', 'wp-editor', 'wp-components', 'wp-data', 'wp-element', 'wp-i18n' ),
+			array( 'wp-plugins', 'wp-editor', 'wp-components', 'wp-data', 'wp-element', 'wp-i18n', 'wp-a11y' ),
 			(string) ( \file_exists( $path ) ? \filemtime( $path ) : VERSION ),
 			true
 		);
@@ -58,21 +58,32 @@ class Editor {
 	}
 
 	/**
-	 * What the panel needs to describe the current default.
+	 * What the panel needs to name the defaults and compute the effective
+	 * result as the author edits format, kind, and override.
 	 *
 	 * @return array
 	 */
 	public static function panel_data() {
 		$settings = Rules::settings();
-		$choices  = Settings::mode_choices();
-		$post     = \get_post();
+
+		$kinds_by_id = array();
+		foreach ( Settings::kind_terms() as $term ) {
+			$kinds_by_id[ (int) $term->term_id ] = array(
+				'slug' => $term->slug,
+				'name' => $term->name,
+			);
+		}
+
+		$format_labels = Settings::format_choices();
 
 		return array(
-			'metaKey'     => Rules::META_KEY,
-			'mode'        => $settings['mode'],
-			'modeLabel'   => $choices[ $settings['mode'] ]['title'],
-			'siteDefault' => ( $post instanceof \WP_Post ) ? Rules::site_rules_send( $post ) : false,
-			'settingsUrl' => \admin_url( 'options-general.php?page=' . Settings::SLUG ),
+			'metaKey'            => Rules::META_KEY,
+			'defaultFormat'      => $settings['default_format'],
+			'defaultFormatLabel' => isset( $format_labels[ $settings['default_format'] ] ) ? $format_labels[ $settings['default_format'] ] : $settings['default_format'],
+			'defaultKind'        => $settings['default_kind'],
+			'legacyAll'          => $settings['legacy_all'],
+			'kindsById'          => $kinds_by_id,
+			'settingsUrl'        => \admin_url( 'options-general.php?page=' . Settings::SLUG ),
 		);
 	}
 }

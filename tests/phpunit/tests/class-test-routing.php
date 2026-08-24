@@ -72,6 +72,11 @@ class Test_Routing extends WP_UnitTestCase {
 	 * @return array|mixed
 	 */
 	public function stub_http( $response, $args, $url ) {
+		if ( false !== $response ) {
+			// Already answered earlier in the chain (the link shim re-issues
+			// requests); don't double-count.
+			return $response;
+		}
 		if ( false !== \strpos( $url, '/newpost' ) ) {
 			$this->newposts[] = $url;
 			return array(

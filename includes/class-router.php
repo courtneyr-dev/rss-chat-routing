@@ -45,6 +45,12 @@ class Router {
 	 * @return void
 	 */
 	public static function init() {
+		// Patched parents ask these filters directly; answering them makes
+		// the get_the_terms stand-in below redundant (it stays for stock
+		// parents and is harmless on both — same decision either way).
+		\add_filter( 'rss_chat_should_syndicate', array( __CLASS__, 'filter_should_syndicate' ), 10, 2 );
+		\add_filter( 'rss_chat_post_item', array( __CLASS__, 'filter_post_item' ), 10, 2 );
+
 		// RSS Chat listens on these at priority 10; sit either side of it.
 		\add_action( 'wp_after_insert_post', array( __CLASS__, 'open_for_insert' ), 9, 2 );
 		\add_action( 'wp_after_insert_post', array( __CLASS__, 'close' ), 11 );
@@ -97,6 +103,65 @@ class Router {
 		}
 
 		self::engage( $post->ID, true );
+	}
+
+	/**
+	 * The routing decision, for parents that ask via the filter.
+	 *
+	 * @param bool     $syndicate The parent's own answer.
+	 * @param \WP_Post $post      The post.
+	 * @return bool
+	 */
+	public static function filter_should_syndicate( $syndicate, $post ) {
+		// While the stand-in is engaged it answers get_post_format() for this
+		// post, which would poison a fresh decision — the engaged state IS
+		// the decision, so report it directly.
+		if ( $post instanceof \WP_Post && (int) $post->ID === self::$post_id ) {
+			return self::$send;
+		}
+
+		return Rules::should_send( $post );
+	}
+
+	/**
+	 * Put the canonical permalink on the item, for parents that ask.
+	 *
+	 * @param array    $item The item payload.
+	 * @param \WP_Post $post The post being pushed.
+	 * @return array
+	 */
+	public static function filter_post_item( $item, $post ) {
+		if ( empty( $item['link'] ) && $post instanceof \WP_Post ) {
+			$permalink = \get_permalink( $post );
+			if ( $permalink ) {
+				$item['link'] = $permalink;
+			}
+		}
+		return $item;
+	}
+
+	/**
+	 * Push one post through the parent right now, with the stand-in engaged.
+	 *
+	 * Used by the Micropub path, where the routing signals only exist after
+	 * the parent's own publish hooks have already run. The parent's
+	 * already-synced guard makes calling this twice harmless.
+	 *
+	 * @param \WP_Post $post The post.
+	 * @return void
+	 */
+	public static function push_now( $post ) {
+		if ( ! $post instanceof \WP_Post || ! \class_exists( '\\RSS_Chat\\Syndication' ) ) {
+			return;
+		}
+
+		self::open( $post );
+		Link_Shim::set_candidate( $post->ID );
+
+		( new \RSS_Chat\Syndication() )->push_from_insert( $post->ID, $post );
+
+		Link_Shim::clear_candidate();
+		self::close();
 	}
 
 	/**
