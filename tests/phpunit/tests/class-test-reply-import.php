@@ -52,6 +52,7 @@ class Test_Reply_Import extends WP_UnitTestCase {
 	 */
 	public function tear_down(): void {
 		\remove_filter( 'pre_http_request', array( $this, 'stub_http' ), 100 );
+		\unregister_meta_key( 'comment', 'protocol' );
 		\delete_option( Rules::OPTION );
 		Plugin::clear_account();
 		Reply_Import::apply_mode();
@@ -283,6 +284,176 @@ class Test_Reply_Import extends WP_UnitTestCase {
 		$result = \apply_filters( 'webmention_comment_data', $commentdata );
 
 		$this->assertSame( $commentdata, $result );
+	}
+
+	// ---------------------------------------------------------------
+	// Both stored spellings of the legacy protocol marker.
+	// ---------------------------------------------------------------
+
+	/**
+	 * Register `protocol` comment meta the way the Webmention plugin does.
+	 *
+	 * Webmention\Receiver::register_meta() gives it sanitize_key, so with that
+	 * plugin active the parent's 'rss.chat' is stored as 'rsschat'.
+	 */
+	private function sanitize_protocol_like_the_webmention_plugin() {
+		\register_meta(
+			'comment',
+			'protocol',
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'sanitize_callback' => 'sanitize_key',
+			)
+		);
+	}
+
+	/**
+	 * Import the remote reply through the parent's legacy importer, then
+	 * switch to webmention mode.
+	 *
+	 * @param bool $sanitized Whether the Webmention plugin's sanitizer is registered.
+	 * @return \WP_Comment The imported comment.
+	 */
+	private function import_legacy_reply( $sanitized ) {
+		if ( $sanitized ) {
+			$this->sanitize_protocol_like_the_webmention_plugin();
+		}
+
+		$this->set_mode( 'legacy' );
+		$this->run_backfeed();
+		$comments = $this->comments();
+		$this->assertCount( 1, $comments, 'precondition: legacy import done' );
+
+		$this->set_mode( 'webmention' );
+
+		return $comments[0];
+	}
+
+	/**
+	 * Comment data as the Webmention receiver passes it to the filter.
+	 *
+	 * @param int    $post_id Target post.
+	 * @param string $source  Webmention source URL.
+	 * @return array
+	 */
+	private function webmention( $post_id, $source ) {
+		return array(
+			'comment_post_ID' => $post_id,
+			'source'          => $source,
+			'target'          => \get_permalink( $post_id ),
+			'comment_meta'    => array(
+				'protocol'              => 'webmention',
+				'webmention_source_url' => $source,
+			),
+		);
+	}
+
+	/**
+	 * The two spellings a legacy-imported comment can carry.
+	 *
+	 * @return array
+	 */
+	public function legacy_protocol_spellings() {
+		return array(
+			'sanitized rsschat (Webmention plugin active)' => array( true, 'rsschat' ),
+			'literal rss.chat (no sanitizer)'              => array( false, 'rss.chat' ),
+		);
+	}
+
+	/**
+	 * A Webmention duplicating a legacy reply is rejected whichever spelling
+	 * was stored, and the legacy comment is left exactly as it was.
+	 *
+	 * @dataProvider legacy_protocol_spellings
+	 *
+	 * @param bool   $sanitized Whether the sanitizer is registered.
+	 * @param string $stored    The protocol value the import must have stored.
+	 */
+	public function test_a_duplicate_webmention_is_rejected_for_either_stored_spelling( $sanitized, $stored ) {
+		$legacy = $this->import_legacy_reply( $sanitized );
+		$this->assertSame( $stored, \get_comment_meta( $legacy->comment_ID, 'protocol', true ), 'precondition: stored spelling' );
+
+		$result = \apply_filters( 'webmention_comment_data', $this->webmention( $this->synced_post, 'https://rss.chat/?id=778' ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'rss_chat_routing_duplicate', $result->get_error_code() );
+		$this->assertCount( 1, $this->comments(), 'still exactly one comment' );
+		$this->assertSame( $legacy->comment_content, \get_comment( $legacy->comment_ID )->comment_content, 'legacy comment content unchanged' );
+		$this->assertSame( $stored, \get_comment_meta( $legacy->comment_ID, 'protocol', true ), 'legacy protocol not rewritten' );
+	}
+
+	/**
+	 * A different Webmention on the same post is accepted.
+	 *
+	 * @dataProvider legacy_protocol_spellings
+	 *
+	 * @param bool $sanitized Whether the sanitizer is registered.
+	 */
+	public function test_a_different_webmention_on_the_same_post_passes_through( $sanitized ) {
+		$this->import_legacy_reply( $sanitized );
+
+		$commentdata = $this->webmention( $this->synced_post, 'https://rss.chat/?id=779' );
+
+		$this->assertSame( $commentdata, \apply_filters( 'webmention_comment_data', $commentdata ) );
+	}
+
+	/**
+	 * The same source aimed at a different post is accepted: the dedup is
+	 * scoped to the post the legacy reply lives on.
+	 *
+	 * @dataProvider legacy_protocol_spellings
+	 *
+	 * @param bool $sanitized Whether the sanitizer is registered.
+	 */
+	public function test_the_same_source_on_a_different_post_passes_through( $sanitized ) {
+		$this->import_legacy_reply( $sanitized );
+		$other = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		$commentdata = $this->webmention( $other, 'https://rss.chat/?id=778' );
+
+		$this->assertSame( $commentdata, \apply_filters( 'webmention_comment_data', $commentdata ) );
+	}
+
+	/**
+	 * Protocols of other networks.
+	 *
+	 * @return array
+	 */
+	public function other_protocols() {
+		return array(
+			'webmention'  => array( 'webmention' ),
+			'activitypub' => array( 'activitypub' ),
+		);
+	}
+
+	/**
+	 * A comment from another network is never treated as a legacy import,
+	 * even when it carries the same rss.chat guid, and is left untouched.
+	 *
+	 * @dataProvider other_protocols
+	 *
+	 * @param string $protocol The other comment's protocol.
+	 */
+	public function test_a_comment_with_another_protocol_is_not_a_legacy_duplicate( $protocol ) {
+		$this->sanitize_protocol_like_the_webmention_plugin();
+		$this->set_mode( 'webmention' );
+		$existing = self::factory()->comment->create(
+			array(
+				'comment_post_ID'  => $this->synced_post,
+				'comment_approved' => 1,
+				'comment_meta'     => array(
+					'protocol'        => $protocol,
+					Plugin::META_GUID => 'https://rss.chat/?id=778',
+				),
+			)
+		);
+
+		$commentdata = $this->webmention( $this->synced_post, 'https://rss.chat/?id=778' );
+		$result      = \apply_filters( 'webmention_comment_data', $commentdata );
+
+		$this->assertSame( $commentdata, $result );
+		$this->assertSame( $protocol, \get_comment_meta( $existing, 'protocol', true ) );
 	}
 
 	// ---------------------------------------------------------------
