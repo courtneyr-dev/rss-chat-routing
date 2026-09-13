@@ -97,8 +97,9 @@ class Reply_Import {
 	 * matches earlier *webmention* comments: when that matched, comment_ID
 	 * is set and this is an update of a genuine Webmention — pass it
 	 * through. Only a source colliding with a comment the legacy importer
-	 * created (protocol=rss.chat, same post) is turned away, which keeps
-	 * that comment intact instead of double-importing or rewriting it.
+	 * created (protocol rss.chat in either stored spelling, same post) is
+	 * turned away, which keeps that comment intact instead of
+	 * double-importing or rewriting it.
 	 *
 	 * @param array|\WP_Error $commentdata Webmention comment data.
 	 * @return array|\WP_Error
@@ -134,8 +135,9 @@ class Reply_Import {
 						'compare' => 'IN',
 					),
 					array(
-						'key'   => \RSS_Chat\Plugin::META_PROTOCOL,
-						'value' => \RSS_Chat\Plugin::PROTOCOL,
+						'key'     => \RSS_Chat\Plugin::META_PROTOCOL,
+						'value'   => self::legacy_protocols(),
+						'compare' => 'IN',
 					),
 				),
 			)
@@ -174,6 +176,28 @@ class Reply_Import {
 		}
 
 		return $spellings;
+	}
+
+	/**
+	 * Every value a legacy-imported comment's `protocol` meta can hold.
+	 *
+	 * The parent writes Plugin::PROTOCOL ('rss.chat'), but the Webmention
+	 * plugin registers `protocol` comment meta with sanitize_key, so while
+	 * that plugin is active the stored value is 'rsschat'. Replies imported
+	 * with and without it carry different spellings; both match, and
+	 * neither is rewritten.
+	 *
+	 * @return string[]
+	 */
+	private static function legacy_protocols() {
+		return \array_values(
+			\array_unique(
+				array(
+					\RSS_Chat\Plugin::PROTOCOL,
+					\sanitize_key( \RSS_Chat\Plugin::PROTOCOL ),
+				)
+			)
+		);
 	}
 
 	/**

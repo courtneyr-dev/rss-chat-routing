@@ -57,6 +57,7 @@ class Test_Comment_Gate extends WP_UnitTestCase {
 	 */
 	public function tear_down(): void {
 		\remove_filter( 'pre_http_request', array( $this, 'stub_http' ), 100 );
+		\unregister_meta_key( 'comment', 'protocol' );
 		\delete_option( Rules::OPTION );
 		Plugin::clear_account();
 		parent::tear_down();
@@ -195,6 +196,37 @@ class Test_Comment_Gate extends WP_UnitTestCase {
 			)
 		);
 
+		$this->assertCount( 0, $this->payloads );
+	}
+
+	/**
+	 * An imported rss chat reply stored with the sanitized protocol is not pushed back.
+	 *
+	 * With the Webmention plugin active, `protocol` meta runs through
+	 * sanitize_key and 'rss.chat' lands as 'rsschat'; the gate must still
+	 * treat it as foreign.
+	 */
+	public function test_an_imported_reply_with_the_sanitized_protocol_is_not_pushed_back() {
+		\register_meta(
+			'comment',
+			'protocol',
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'sanitize_callback' => 'sanitize_key',
+			)
+		);
+
+		$comment_id = $this->insert_comment(
+			array(
+				'comment_meta' => array(
+					'protocol'        => Plugin::PROTOCOL,
+					Plugin::META_GUID => 'https://rss.chat/?id=556',
+				),
+			)
+		);
+
+		$this->assertSame( 'rsschat', \get_comment_meta( $comment_id, 'protocol', true ), 'precondition: sanitized on write' );
 		$this->assertCount( 0, $this->payloads );
 	}
 
