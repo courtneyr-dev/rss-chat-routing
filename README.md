@@ -55,7 +55,7 @@ Where the parent plugin exposes filters (`rss_chat_should_syndicate`, `rss_chat_
 - `Comment_Gate` answers the parent's "already synced?" question with a sentinel for foreign comments, so inbound interactions are never re-broadcast.
 - `Micropub` re-evaluates at `after_micropub` priority 40 — after Outpost's bridges (20) and Post Kinds (30) have set format and kind, which the parent's own hooks fire too early to see — and asks the parent to push. The parent's already-synced guard keeps it idempotent.
 
-The test suite runs green against both the stock and the patched parent.
+The test suite runs green against RSS Chat at `1bcbbf2` (upstream before the filters), `ec439ef` (the patched parent), and `2480875` (upstream `main`, 2026-09-11). Against revisions older than upstream PR #2 (`a2a4742`, 2026-07-31), such as `8f5bb19`, `test_a_local_comment_is_still_pushed` fails: those parents post the reply parent as `inReplyToNum`, and upstream switched to `inReplyTo` because older self-hosted servers reject `inReplyToNum` on write.
 
 ## Tests
 
