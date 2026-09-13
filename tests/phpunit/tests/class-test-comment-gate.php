@@ -106,6 +106,8 @@ class Test_Comment_Gate extends WP_UnitTestCase {
 					'comment_content'  => 'A reply.',
 					'comment_approved' => 1,
 					'comment_type'     => 'comment',
+					// Upstream pushes only comments written by a user of the site.
+					'user_id'          => self::factory()->user->create(),
 				),
 				$overrides
 			)
