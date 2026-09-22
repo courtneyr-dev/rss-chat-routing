@@ -25,6 +25,10 @@
  * Removal path: replace with upstream's `rss_chat_should_push_comment`
  * filter once it exists.
  *
+ * The same wp_insert_comment hook also covers the other direction: it
+ * treats rows inserted while `Backfeed::$importing` is set as untrusted
+ * remote input, sanitizing them and holding them for moderation.
+ *
  * @package RSS_Chat_Routing
  */
 
@@ -85,12 +89,68 @@ class Comment_Gate {
 		if ( ! $comment instanceof \WP_Comment ) {
 			return;
 		}
+
+		self::sanitize_backfeed_import( $comment_id, $comment );
+
 		if ( ! self::is_foreign( $comment ) ) {
 			return;
 		}
 
 		self::$comment_id = (int) $comment_id;
 		\add_filter( 'get_comment_metadata', array( __CLASS__, 'answer' ), 10, 3 );
+	}
+
+	/**
+	 * Treat a row inserted while `\RSS_Chat\Backfeed::$importing` is set as
+	 * untrusted remote input: sanitize it and hold it for moderation. The
+	 * flag is the only signal available that a row came from there rather
+	 * than a local commenter.
+	 *
+	 * Calling wp_update_comment() with its $wp_error argument turns a
+	 * failure into a WP_Error instead of silently leaving the row as
+	 * inserted; on that, or on a false return, the row is at least held via
+	 * wp_set_comment_status(). Neither call re-fires wp_insert_comment, so
+	 * this cannot recurse. On success the sanitized values are mirrored onto
+	 * $comment so a wp_insert_comment subscriber running after this one sees
+	 * the moderated row, not the original.
+	 *
+	 * @param int         $comment_id Comment id.
+	 * @param \WP_Comment $comment    The comment as inserted.
+	 * @return void
+	 */
+	private static function sanitize_backfeed_import( $comment_id, $comment ) {
+		if ( ! \class_exists( '\\RSS_Chat\\Backfeed' ) || empty( \RSS_Chat\Backfeed::$importing ) ) {
+			return;
+		}
+
+		$content = \wp_kses( $comment->comment_content, \wp_kses_allowed_html( 'comment' ) );
+		$author  = \sanitize_text_field( $comment->comment_author );
+		$url     = \wp_http_validate_url( $comment->comment_author_url )
+			? \esc_url_raw( $comment->comment_author_url, array( 'http', 'https' ) )
+			: '';
+
+		$updated = \wp_update_comment(
+			\wp_slash(
+				array(
+					'comment_ID'         => $comment_id,
+					'comment_content'    => $content,
+					'comment_author'     => $author,
+					'comment_author_url' => $url,
+					'comment_approved'   => 0,
+				)
+			),
+			true
+		);
+
+		if ( \is_wp_error( $updated ) || false === $updated ) {
+			\wp_set_comment_status( $comment_id, 'hold' );
+			return;
+		}
+
+		$comment->comment_content    = $content;
+		$comment->comment_author     = $author;
+		$comment->comment_author_url = $url;
+		$comment->comment_approved   = '0';
 	}
 
 	/**

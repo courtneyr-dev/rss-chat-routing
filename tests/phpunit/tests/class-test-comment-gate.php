@@ -9,6 +9,7 @@
 namespace RSS_Chat_Routing\Tests;
 
 use WP_UnitTestCase;
+use RSS_Chat\Backfeed;
 use RSS_Chat\Plugin;
 use RSS_Chat_Routing\Rules;
 
@@ -60,6 +61,7 @@ class Test_Comment_Gate extends WP_UnitTestCase {
 		\unregister_meta_key( 'comment', 'protocol' );
 		\delete_option( Rules::OPTION );
 		Plugin::clear_account();
+		Backfeed::$importing = false;
 		parent::tear_down();
 	}
 
@@ -246,5 +248,57 @@ class Test_Comment_Gate extends WP_UnitTestCase {
 		$this->insert_comment();
 
 		$this->assertCount( 1, $this->payloads );
+	}
+
+	/**
+	 * A row inserted while Backfeed::$importing is set is untrusted remote
+	 * input: the gate must sanitize it and hold it for moderation.
+	 */
+	public function test_a_backfeed_import_is_sanitized_and_held_for_moderation() {
+		Backfeed::$importing = true;
+
+		$comment_id = (int) \wp_insert_comment(
+			array(
+				'comment_post_ID'    => $this->synced_post,
+				'comment_content'    => 'hi <script>x</script>',
+				'comment_author'     => '<b>a</b>',
+				'comment_author_url' => 'javascript:1',
+				'comment_approved'   => 1,
+				'comment_type'       => 'comment',
+			)
+		);
+
+		Backfeed::$importing = false;
+
+		$comment = \get_comment( $comment_id );
+
+		$this->assertStringNotContainsString( '<script', $comment->comment_content );
+		$this->assertSame( 'a', $comment->comment_author );
+		$this->assertSame( '', $comment->comment_author_url );
+		$this->assertSame( '0', $comment->comment_approved );
+	}
+
+	/**
+	 * With Backfeed::$importing off, an ordinary comment is left exactly as
+	 * inserted: this gate only touches rows flagged as backfeed imports.
+	 */
+	public function test_an_ordinary_insert_is_left_unchanged_when_the_flag_is_off() {
+		$comment_id = (int) \wp_insert_comment(
+			array(
+				'comment_post_ID'    => $this->synced_post,
+				'comment_content'    => 'hi <script>x</script>',
+				'comment_author'     => '<b>a</b>',
+				'comment_author_url' => 'javascript:1',
+				'comment_approved'   => 1,
+				'comment_type'       => 'comment',
+			)
+		);
+
+		$comment = \get_comment( $comment_id );
+
+		$this->assertSame( 'hi <script>x</script>', $comment->comment_content );
+		$this->assertSame( '<b>a</b>', $comment->comment_author );
+		$this->assertSame( 'javascript:1', $comment->comment_author_url );
+		$this->assertSame( '1', $comment->comment_approved );
 	}
 }
