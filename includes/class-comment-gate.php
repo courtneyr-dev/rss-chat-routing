@@ -121,17 +121,15 @@ class Comment_Gate {
 	 *
 	 * Calling wp_update_comment() with its $wp_error argument turns a
 	 * failure into a WP_Error instead of silently leaving the row as
-	 * inserted. If that update fails — a filter veto, or content that grows
-	 * past a column limit once WordPress's own comment filters run again on
-	 * an update — a second attempt clears every sanitized field to an empty
-	 * string and forces the row held, since an empty value cannot fail the
-	 * same way; if even that fails, the row is deleted outright rather than
-	 * left holding unsanitized content that an admin's Comments screen would
-	 * render unescaped. Neither wp_update_comment() nor wp_delete_comment()
-	 * re-fires wp_insert_comment, so none of this can recurse. On success
-	 * the freshly stored row is re-read and mirrored onto $comment, so a
-	 * wp_insert_comment subscriber running after this one sees the
-	 * moderated row, not the original.
+	 * inserted. If that update fails, a second attempt clears every
+	 * sanitized field to an empty string and forces the row held, since an
+	 * empty value cannot fail the same way; if even that fails, the row is
+	 * deleted. Neither wp_update_comment() nor wp_delete_comment() re-fires
+	 * wp_insert_comment, so none of this can recurse. Whichever of the
+	 * three outcomes actually happens, the stored (or, if deleted, blanked)
+	 * values are mirrored onto $comment, so a wp_insert_comment subscriber
+	 * running after this one always sees the moderated row, never the
+	 * original.
 	 *
 	 * @param int         $comment_id Comment id.
 	 * @param \WP_Comment $comment    The comment as inserted, when the
@@ -181,25 +179,59 @@ class Comment_Gate {
 					'comment_content'    => '',
 					'comment_author'     => '',
 					'comment_author_url' => '',
-					'comment_approved'   => 0,
+					'comment_approved'   => $approved,
 				),
 				true
 			);
 
 			if ( \is_wp_error( $cleared ) || false === $cleared ) {
 				\wp_delete_comment( $comment_id, true );
+				self::apply_to_comment( $comment, '', '', '', '0' );
+				return;
 			}
 
+			self::mirror_from_db( $comment, $comment_id );
 			return;
 		}
 
+		self::mirror_from_db( $comment, $comment_id );
+	}
+
+	/**
+	 * Re-read a comment's four moderation-relevant fields as currently
+	 * stored and copy them onto $comment.
+	 *
+	 * @param \WP_Comment|null $comment    Object to update, if any.
+	 * @param int              $comment_id Comment id to re-read.
+	 * @return void
+	 */
+	private static function mirror_from_db( $comment, $comment_id ) {
 		$fresh = \get_comment( $comment_id );
-		if ( $fresh instanceof \WP_Comment && $comment instanceof \WP_Comment ) {
-			$comment->comment_content    = $fresh->comment_content;
-			$comment->comment_author     = $fresh->comment_author;
-			$comment->comment_author_url = $fresh->comment_author_url;
-			$comment->comment_approved   = $fresh->comment_approved;
+		if ( $fresh instanceof \WP_Comment ) {
+			self::apply_to_comment( $comment, $fresh->comment_content, $fresh->comment_author, $fresh->comment_author_url, $fresh->comment_approved );
 		}
+	}
+
+	/**
+	 * Copy four moderation-relevant fields onto $comment, when the caller
+	 * supplied one.
+	 *
+	 * @param \WP_Comment|null $comment  Object to update, if any.
+	 * @param string           $content  Comment content.
+	 * @param string           $author   Comment author name.
+	 * @param string           $url      Comment author URL.
+	 * @param string           $approved Comment approval status.
+	 * @return void
+	 */
+	private static function apply_to_comment( $comment, $content, $author, $url, $approved ) {
+		if ( ! $comment instanceof \WP_Comment ) {
+			return;
+		}
+
+		$comment->comment_content    = $content;
+		$comment->comment_author     = $author;
+		$comment->comment_author_url = $url;
+		$comment->comment_approved   = $approved;
 	}
 
 	/**

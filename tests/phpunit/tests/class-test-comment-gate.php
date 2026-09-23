@@ -415,11 +415,8 @@ class Test_Comment_Gate extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An author name long enough that WordPress's own comment filters grow
-	 * it past the column limit on the sanitizing update must not leave the
-	 * unsanitized `<script>` content on the post either way: whether the
-	 * update fails over to the empty-value fallback or succeeds outright,
-	 * no comment stored against the post may carry the raw script tag.
+	 * An import whose sanitizing update fails must not leave `<script>`
+	 * content on the post.
 	 */
 	public function test_an_overlong_author_import_leaves_no_script_on_the_post() {
 		Backfeed::$importing = true;
@@ -442,6 +439,9 @@ class Test_Comment_Gate extends WP_UnitTestCase {
 				'status'  => 'any',
 			)
 		);
+
+		$this->assertCount( 1, $stored_comments );
+		$this->assertSame( '', $stored_comments[0]->comment_content );
 
 		foreach ( $stored_comments as $stored ) {
 			$this->assertStringNotContainsString( '<script', $stored->comment_content );
