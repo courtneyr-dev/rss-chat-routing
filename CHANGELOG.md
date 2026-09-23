@@ -37,8 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Route posts to rss.chat without requiring the core `chat` post format.
 
-[Unreleased]: https://github.com/courtneyr-dev/rss-chat-routing/compare/0.2.2...HEAD
-[0.2.2]: https://github.com/courtneyr-dev/rss-chat-routing/compare/0.2.1...0.2.2
-[0.2.1]: https://github.com/courtneyr-dev/rss-chat-routing/compare/0.2.0...0.2.1
-[0.2.0]: https://github.com/courtneyr-dev/rss-chat-routing/compare/0.1.0...0.2.0
-[0.1.0]: https://github.com/courtneyr-dev/rss-chat-routing/releases/tag/0.1.0
+No git tags exist for these releases yet, so the links below point at commit ranges
+rather than tag comparisons.
+
+[0.2.2]: https://github.com/courtneyr-dev/rss-chat-routing/compare/9deab4c9a66ffaf22b16c79625dd6333d0b9e04b...9eaf1599797d0fe56d79f03ae70cca94312a8217
+[0.2.1]: https://github.com/courtneyr-dev/rss-chat-routing/compare/58d12b9bba04dcda8c40183a98f65d07a817ba68...9deab4c9a66ffaf22b16c79625dd6333d0b9e04b
+[0.2.0]: https://github.com/courtneyr-dev/rss-chat-routing/compare/c4dd26b2b260bfaa0ff392c6418cce0953aebd57...58d12b9bba04dcda8c40183a98f65d07a817ba68
+[0.1.0]: https://github.com/courtneyr-dev/rss-chat-routing/commit/c4dd26b2b260bfaa0ff392c6418cce0953aebd57

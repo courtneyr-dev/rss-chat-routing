@@ -25,9 +25,11 @@
  * Removal path: replace with upstream's `rss_chat_should_push_comment`
  * filter once it exists.
  *
- * The same wp_insert_comment hook also covers the other direction: it
- * treats rows inserted while `Backfeed::$importing` is set as untrusted
- * remote input, sanitizing them and holding them for moderation.
+ * A second, earlier wp_insert_comment callback covers the other
+ * direction: it treats rows inserted while `Backfeed::$importing` is set
+ * as untrusted remote input, sanitizing them and holding them for
+ * moderation, before any other subscriber to the same action sees the
+ * raw row.
  *
  * @package RSS_Chat_Routing
  */
@@ -56,6 +58,10 @@ class Comment_Gate {
 	 * @return void
 	 */
 	public static function init() {
+		// Runs before every other wp_insert_comment subscriber, so as few of
+		// them as possible ever see an unsanitized backfeed row.
+		\add_action( 'wp_insert_comment', array( __CLASS__, 'sanitize_backfeed_import' ), \PHP_INT_MIN, 2 );
+
 		\add_action( 'wp_insert_comment', array( __CLASS__, 'open' ), 9, 2 );
 		\add_action( 'wp_insert_comment', array( __CLASS__, 'close' ), 11 );
 
@@ -90,8 +96,6 @@ class Comment_Gate {
 			return;
 		}
 
-		self::sanitize_backfeed_import( $comment_id, $comment );
-
 		if ( ! self::is_foreign( $comment ) ) {
 			return;
 		}
@@ -104,30 +108,58 @@ class Comment_Gate {
 	 * Treat a row inserted while `\RSS_Chat\Backfeed::$importing` is set as
 	 * untrusted remote input: sanitize it and hold it for moderation. The
 	 * flag is the only signal available that a row came from there rather
-	 * than a local commenter.
+	 * than a local commenter. Registered directly on wp_insert_comment at
+	 * PHP_INT_MIN rather than called from open(), so it runs before that
+	 * priority-9 gate and any other subscriber. The row is always re-read by
+	 * $comment_id rather than trusted from the second argument, since that
+	 * keeps working even if some future caller of the action does not pass
+	 * a WP_Comment there.
+	 *
+	 * A comment already flagged spam or trashed is left at that status;
+	 * only an approved (`1`) row is downgraded to held, so this cannot
+	 * un-spam or un-trash a row another plugin has already judged.
 	 *
 	 * Calling wp_update_comment() with its $wp_error argument turns a
 	 * failure into a WP_Error instead of silently leaving the row as
-	 * inserted; on that, or on a false return, the row is at least held via
-	 * wp_set_comment_status(). Neither call re-fires wp_insert_comment, so
-	 * this cannot recurse. On success the sanitized values are mirrored onto
-	 * $comment so a wp_insert_comment subscriber running after this one sees
-	 * the moderated row, not the original.
+	 * inserted. If that update fails — a filter veto, or content that grows
+	 * past a column limit once WordPress's own comment filters run again on
+	 * an update — a second attempt clears every sanitized field to an empty
+	 * string and forces the row held, since an empty value cannot fail the
+	 * same way; if even that fails, the row is deleted outright rather than
+	 * left holding unsanitized content that an admin's Comments screen would
+	 * render unescaped. Neither wp_update_comment() nor wp_delete_comment()
+	 * re-fires wp_insert_comment, so none of this can recurse. On success
+	 * the freshly stored row is re-read and mirrored onto $comment, so a
+	 * wp_insert_comment subscriber running after this one sees the
+	 * moderated row, not the original.
 	 *
 	 * @param int         $comment_id Comment id.
-	 * @param \WP_Comment $comment    The comment as inserted.
+	 * @param \WP_Comment $comment    The comment as inserted, when the
+	 *                                caller supplied one; only used for the
+	 *                                final mirror step, never to decide
+	 *                                whether to act.
 	 * @return void
 	 */
-	private static function sanitize_backfeed_import( $comment_id, $comment ) {
+	public static function sanitize_backfeed_import( $comment_id, $comment = null ) {
 		if ( ! \class_exists( '\\RSS_Chat\\Backfeed' ) || empty( \RSS_Chat\Backfeed::$importing ) ) {
 			return;
 		}
 
-		$content = \wp_kses( $comment->comment_content, \wp_kses_allowed_html( 'comment' ) );
-		$author  = \sanitize_text_field( $comment->comment_author );
-		$url     = \wp_http_validate_url( $comment->comment_author_url )
-			? \esc_url_raw( $comment->comment_author_url, array( 'http', 'https' ) )
+		$original = \get_comment( $comment_id );
+		if ( ! $original instanceof \WP_Comment ) {
+			return;
+		}
+
+		$content = \wp_kses( $original->comment_content, \wp_kses_allowed_html( 'comment' ) );
+		$author  = \sanitize_text_field( $original->comment_author );
+
+		$parsed_url = \wp_parse_url( (string) $original->comment_author_url );
+		$scheme     = isset( $parsed_url['scheme'] ) ? \strtolower( $parsed_url['scheme'] ) : '';
+		$url        = ( \in_array( $scheme, array( 'http', 'https' ), true ) && ! empty( $parsed_url['host'] ) )
+			? \esc_url_raw( $original->comment_author_url, array( 'http', 'https' ) )
 			: '';
+
+		$approved = ( '1' === (string) $original->comment_approved ) ? 0 : $original->comment_approved;
 
 		$updated = \wp_update_comment(
 			\wp_slash(
@@ -136,21 +168,38 @@ class Comment_Gate {
 					'comment_content'    => $content,
 					'comment_author'     => $author,
 					'comment_author_url' => $url,
-					'comment_approved'   => 0,
+					'comment_approved'   => $approved,
 				)
 			),
 			true
 		);
 
 		if ( \is_wp_error( $updated ) || false === $updated ) {
-			\wp_set_comment_status( $comment_id, 'hold' );
+			$cleared = \wp_update_comment(
+				array(
+					'comment_ID'         => $comment_id,
+					'comment_content'    => '',
+					'comment_author'     => '',
+					'comment_author_url' => '',
+					'comment_approved'   => 0,
+				),
+				true
+			);
+
+			if ( \is_wp_error( $cleared ) || false === $cleared ) {
+				\wp_delete_comment( $comment_id, true );
+			}
+
 			return;
 		}
 
-		$comment->comment_content    = $content;
-		$comment->comment_author     = $author;
-		$comment->comment_author_url = $url;
-		$comment->comment_approved   = '0';
+		$fresh = \get_comment( $comment_id );
+		if ( $fresh instanceof \WP_Comment && $comment instanceof \WP_Comment ) {
+			$comment->comment_content    = $fresh->comment_content;
+			$comment->comment_author     = $fresh->comment_author;
+			$comment->comment_author_url = $fresh->comment_author_url;
+			$comment->comment_approved   = $fresh->comment_approved;
+		}
 	}
 
 	/**
