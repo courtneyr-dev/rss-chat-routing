@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       RSS Chat Routing
  * Plugin URI:        https://github.com/courtneyr-dev/rss-chat-routing
- * Description:       Choose which posts go to rss.chat by default post format, default Post Kind, or per post — and bring replies home as verified Webmentions.
- * Version:           0.2.2
+ * Description:       Choose which posts go to rss.chat (opt in, opt out, by post format and Post Kind, or ask on every post) and bring replies home as verified Webmentions.
+ * Version:           0.3.0
  * Requires at least: 6.6
  * Requires PHP:      7.4
  * Author:            Courtney Robertson
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const VERSION = '0.2.2';
+const VERSION = '0.3.0';
 const FILE    = __FILE__;
 
 require_once __DIR__ . '/includes/class-rules.php';

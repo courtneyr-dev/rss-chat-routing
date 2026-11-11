@@ -1,6 +1,6 @@
 # RSS Chat Routing
 
-Chooses which posts go to [rss.chat](https://rss.chat) — by default post format, by default Post Kind, or per post — and brings replies home as real, verified Webmentions.
+Chooses which posts go to [rss.chat](https://rss.chat) (opt in, opt out, by post format and Post Kind, or ask on every post) and brings replies home as real, verified Webmentions.
 
 ## Why
 
@@ -20,14 +20,21 @@ Upstream has been asked whether the check could be filterable: [pfefferle/wordpr
 
 Settings → RSS Chat Routing, plus an **rss.chat** panel in the post sidebar.
 
-**Routing.** Pick up to one default post format and up to one default post kind; either can be empty. A post matching either one is sent by default. Every post keeps a three-state override in the editor — *Use the site default*, *Include in RSS Chat*, *Exclude from RSS Chat* — and an explicit choice always wins. The panel shows the effective result and why ("Included because the post format is Status."). A fresh install defaults to the chat format, which is exactly what RSS Chat does alone, so activating changes nothing.
+**Routing.** Settings → *When to send posts* picks what happens to a post you haven't marked:
+
+- **Only posts I opt in** — nothing is sent until you choose *Include* on a post.
+- **Every post unless I opt it out** — every published post is sent unless you choose *Exclude* on it.
+- **Decide by post format and kind** — pick up to one default post format and up to one default post kind; either can be empty, and a post matching either one is sent. This is the default mode, and with its chat format default it does exactly what RSS Chat does alone, so activating changes nothing.
+- **Ask me on every post** — no default. The editor repeats the choice in the pre-publish checks, open until you pick, and a post left unchosen isn't sent.
+
+Every post keeps a three-state override in the editor — *Use the site default*, *Include in RSS Chat*, *Exclude from RSS Chat* — and an explicit choice always wins. The panel names what the site default does in the current mode and shows the effective result and why ("Included because the post format is Status.").
 
 The decision, in precedence order:
 
 1. Content rss.chat must never syndicate (drafts, other post types, password-protected posts, revisions, autosaves) is never sent, whatever else says.
 2. A per-post **exclude** wins.
 3. A per-post **include** wins.
-4. Otherwise the post is sent when it matches the default format **or** the default kind.
+4. Otherwise the send mode decides: *opt out* sends, *opt in* and *ask on every post* hold the post, and *format and kind* sends it when it matches the default format **or** the default kind.
 5. Otherwise it stays home.
 
 Micropub clients (Outpost among them) can send the override as `mp-rss-chat-routing: inherit | include | exclude`; omitted means inherit and the server-side decision stays authoritative. The same three states ride the REST API (`meta._rss_chat_routing`), where invalid values are rejected with a 400 rather than coerced.
@@ -44,7 +51,7 @@ Micropub clients (Outpost among them) can send the override as `mp-rss-chat-rout
 
 ## Migrating from 0.1.x
 
-Nothing to do. The old `format` / `all` / `none` option shape is read in place: `format` becomes the chat default format, `none` becomes no defaults, and the first ticked kind becomes the default kind. An install still on `all` keeps sending everything until the settings screen is saved once — the screen says so. Stored per-post choices (`1`/`0`) keep their meaning forever. Settings changes only affect future publishes; nothing is bulk-syndicated, and excluding an already-synced post neither deletes nor re-sends the remote item.
+Nothing to do. The old `format` / `all` / `none` option shape is read in place: `format` becomes the chat default format, `none` becomes no defaults, and the first ticked kind becomes the default kind. An install still on `all` reads as *Every post unless I opt it out*, so it keeps sending everything, and saving the screen keeps whichever mode is selected. Stored per-post choices (`1`/`0`) keep their meaning forever. Settings changes only affect future publishes; nothing is bulk-syndicated, and excluding an already-synced post neither deletes nor re-sends the remote item.
 
 ## How it works
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-11
+
+### Added
+
+- A sitewide *When to send posts* setting with four modes: only posts you opt in, every post
+  unless you opt it out, decide by post format and kind (the default, unchanged behavior), and
+  ask on every post. The last one repeats the include/exclude choice in the pre-publish checks.
+
+### Changed
+
+- An install still on the 0.1.x `all` option now reads as *Every post unless I opt it out*.
+  It keeps sending everything, and saving the settings screen no longer silently switches it
+  to the format default.
+
 ## [0.2.2] - 2026-09-22
 
 ### Fixed
@@ -42,7 +56,8 @@ rather than tag comparisons. [Unreleased] and [0.2.2] both end at this branch's 
 (neither is tagged yet) rather than a fixed commit, so they keep resolving correctly
 as work continues here.
 
-[Unreleased]: https://github.com/courtneyr-dev/rss-chat-routing/compare/9eaf1599797d0fe56d79f03ae70cca94312a8217...fix/0.2.2-sanitize-backfeed
+[Unreleased]: https://github.com/courtneyr-dev/rss-chat-routing/compare/462ff8186c48252a48f704add62accbabf5edc57...feat/send-mode
+[0.3.0]: https://github.com/courtneyr-dev/rss-chat-routing/compare/462ff8186c48252a48f704add62accbabf5edc57...feat/send-mode
 [0.2.2]: https://github.com/courtneyr-dev/rss-chat-routing/compare/9deab4c9a66ffaf22b16c79625dd6333d0b9e04b...fix/0.2.2-sanitize-backfeed
 [0.2.1]: https://github.com/courtneyr-dev/rss-chat-routing/compare/58d12b9bba04dcda8c40183a98f65d07a817ba68...9deab4c9a66ffaf22b16c79625dd6333d0b9e04b
 [0.2.0]: https://github.com/courtneyr-dev/rss-chat-routing/compare/c4dd26b2b260bfaa0ff392c6418cce0953aebd57...58d12b9bba04dcda8c40183a98f65d07a817ba68
