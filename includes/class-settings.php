@@ -60,7 +60,7 @@ class Settings {
 			<h1><?php echo \esc_html__( 'RSS Chat Routing', 'rss-chat-routing' ); ?></h1>
 
 			<p>
-				<?php echo \esc_html__( 'Posts matching the default post format or the default post kind are sent to rss.chat. Either match is enough, and any individual post can opt in or out from the editor sidebar — a per-post choice always wins.', 'rss-chat-routing' ); ?>
+				<?php echo \esc_html__( 'Choose what happens to a post you haven’t marked. Any post can be included or excluded from the rss.chat panel in the editor sidebar, and that choice always wins.', 'rss-chat-routing' ); ?>
 			</p>
 
 			<?php if ( ! is_parent_active() ) : ?>
@@ -71,16 +71,35 @@ class Settings {
 
 			<?php if ( $settings['legacy_all'] ) : ?>
 				<div class="notice notice-info inline">
-					<p><?php echo \esc_html__( 'This site still uses the retired "send every post" setting. It keeps working until you save this screen; saving switches to the defaults chosen below.', 'rss-chat-routing' ); ?></p>
+					<p><?php echo \esc_html__( 'This site still uses the original "send every post" setting. It appears below as "Every post unless I opt it out"; saving keeps whichever choice you leave selected.', 'rss-chat-routing' ); ?></p>
 				</div>
 			<?php endif; ?>
 
 			<form action="options.php" method="post">
 				<?php \settings_fields( 'rss_chat_routing' ); ?>
 
+				<h2><?php echo \esc_html__( 'When to send posts', 'rss-chat-routing' ); ?></h2>
+				<fieldset>
+					<legend class="screen-reader-text"><?php echo \esc_html__( 'When to send posts to rss.chat', 'rss-chat-routing' ); ?></legend>
+					<?php foreach ( self::send_mode_choices() as $mode => $choice ) : ?>
+						<p>
+							<label>
+								<input
+									type="radio"
+									name="<?php echo \esc_attr( Rules::OPTION ); ?>[send_mode]"
+									value="<?php echo \esc_attr( $mode ); ?>"
+									<?php \checked( $settings['send_mode'], $mode ); ?>
+								/>
+								<?php echo \esc_html( $choice['title'] ); ?>
+								<span class="description"><br /><?php echo \esc_html( $choice['help'] ); ?></span>
+							</label>
+						</p>
+					<?php endforeach; ?>
+				</fieldset>
+
 				<h2><?php echo \esc_html__( 'Default post format', 'rss-chat-routing' ); ?></h2>
 				<p class="description">
-					<?php echo \esc_html__( 'Posts with this format are sent by default. Note: with a default other than Chat, the chat post format no longer sends posts on its own.', 'rss-chat-routing' ); ?>
+					<?php echo \esc_html__( 'Used only with "Decide by post format and kind." Posts with this format are sent by default. With a default other than Chat, the chat post format no longer sends posts on its own.', 'rss-chat-routing' ); ?>
 				</p>
 				<fieldset>
 					<legend class="screen-reader-text"><?php echo \esc_html__( 'Default post format', 'rss-chat-routing' ); ?></legend>
@@ -117,7 +136,7 @@ class Settings {
 					</p>
 				<?php else : ?>
 					<p class="description">
-						<?php echo \esc_html__( 'Posts with this kind are sent by default, whatever their post format.', 'rss-chat-routing' ); ?>
+						<?php echo \esc_html__( 'Used only with "Decide by post format and kind." Posts with this kind are sent by default, whatever their post format.', 'rss-chat-routing' ); ?>
 					</p>
 					<p>
 						<label for="rss-chat-routing-default-kind">
@@ -196,6 +215,32 @@ class Settings {
 		}
 
 		return $choices;
+	}
+
+	/**
+	 * The four send modes, with plain descriptions.
+	 *
+	 * @return array
+	 */
+	public static function send_mode_choices() {
+		return array(
+			'opt_in'   => array(
+				'title' => \__( 'Only posts I opt in', 'rss-chat-routing' ),
+				'help'  => \__( 'Nothing goes to rss.chat until you choose Include on a post.', 'rss-chat-routing' ),
+			),
+			'opt_out'  => array(
+				'title' => \__( 'Every post unless I opt it out', 'rss-chat-routing' ),
+				'help'  => \__( 'Every published post goes to rss.chat unless you choose Exclude on it.', 'rss-chat-routing' ),
+			),
+			'rules'    => array(
+				'title' => \__( 'Decide by post format and kind', 'rss-chat-routing' ),
+				'help'  => \__( 'Posts matching the default format or kind below go to rss.chat. With the Chat format default, this is what RSS Chat does on its own.', 'rss-chat-routing' ),
+			),
+			'per_post' => array(
+				'title' => \__( 'Ask me on every post', 'rss-chat-routing' ),
+				'help'  => \__( 'No default. The editor asks you to choose Include or Exclude before publishing, and a post left unchosen isn’t sent.', 'rss-chat-routing' ),
+			),
+		);
 	}
 
 	/**

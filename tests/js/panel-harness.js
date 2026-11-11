@@ -12,12 +12,13 @@ function makeWp(state) {
     plugins: { registerPlugin: (name, opts) => { registered = { name, opts }; } },
     element: {
       createElement: (type, props, ...children) => ({ type, props, children: children.flat() }),
+      Fragment: 'Fragment',
       useEffect: (fn) => { effects.push(fn); fn(); },
     },
     i18n: { __: (s) => s, sprintf: (s, v) => s.replace('%s', v) },
     a11y: { speak: (msg) => spoken.push(msg) },
     components: { RadioControl: 'RadioControl' },
-    editor: { PluginDocumentSettingPanel: 'Panel' },
+    editor: { PluginDocumentSettingPanel: 'Panel', PluginPrePublishPanel: 'PrePublish' },
     data: {
       useSelect: (fn) => fn((store) => ({
         getCurrentPostType: () => state.postType,
@@ -81,6 +82,46 @@ for (const c of cases) {
   for (const v of ['include', 'exclude']) {
     if (!radio.includes('"' + v + '"')) { failures++; console.log('FAIL: missing radio value', v); }
   }
+}
+
+// Sitewide send modes.
+function find(node, type) {
+  if (!node || typeof node !== 'object') return null;
+  if (node.type === type) return node;
+  for (const c of node.children || []) { const hit = find(c, type); if (hit) return hit; }
+  return null;
+}
+
+const modeCases = [
+  { mode: 'opt_in', meta: {}, format: 'status',
+    expect: 'Not sent: the site sends only posts you include.', label: 'Use the site default (don’t send)' },
+  { mode: 'opt_in', meta: { _rss_chat_routing: 'include' }, format: '',
+    expect: 'Included by this post’s override.' },
+  { mode: 'opt_out', meta: {}, format: 'aside',
+    expect: 'Included: the site sends every post you don’t exclude.', label: 'Use the site default (send)' },
+  { mode: 'opt_out', meta: { _rss_chat_routing: 'exclude' }, format: '',
+    expect: 'Excluded by this post’s override.' },
+  { mode: 'per_post', meta: {}, format: 'status',
+    expect: 'Not sent yet: choose Include or Exclude for this post.', label: 'Not chosen yet (won’t send)', prepublishOpen: true },
+  { mode: 'per_post', meta: { _rss_chat_routing: 'include' }, format: '',
+    expect: 'Included by this post’s override.', prepublishOpen: false },
+];
+
+for (const c of modeCases) {
+  const name = c.mode + ' ' + JSON.stringify(c.meta);
+  const tree = render({ postType: 'post', meta: c.meta, format: c.format, kind: [] }, Object.assign({}, config, { sendMode: c.mode }));
+  const text = textOf(tree).join(' ');
+  const json = JSON.stringify(tree);
+  const pre = find(tree, 'PrePublish');
+  let ok = text.includes(c.expect) && spoken.includes(c.expect);
+  if (c.label && !json.includes(JSON.stringify(c.label))) ok = false;
+  if ('prepublishOpen' in c) {
+    if (!pre || pre.props.initialOpen !== c.prepublishOpen || !find(pre, 'RadioControl')) ok = false;
+  } else if (pre) {
+    ok = false;
+  }
+  if (!ok) { failures++; console.log('FAIL:', name, '\n  wanted:', c.expect, '\n  got:', text, '\n  prepublish:', pre && pre.props); }
+  else console.log('ok:', name);
 }
 
 // Non-post types render nothing.

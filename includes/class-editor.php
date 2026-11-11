@@ -78,6 +78,7 @@ class Editor {
 
 		return array(
 			'metaKey'            => Rules::META_KEY,
+			'sendMode'           => $settings['send_mode'],
 			'defaultFormat'      => $settings['default_format'],
 			'defaultFormatLabel' => isset( $format_labels[ $settings['default_format'] ] ) ? $format_labels[ $settings['default_format'] ] : $settings['default_format'],
 			'defaultKind'        => $settings['default_kind'],

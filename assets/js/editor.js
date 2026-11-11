@@ -19,8 +19,44 @@
 		( wp.editor && wp.editor.PluginDocumentSettingPanel ) ||
 		( wp.editPost && wp.editPost.PluginDocumentSettingPanel );
 
+	var PluginPrePublishPanel =
+		( wp.editor && wp.editor.PluginPrePublishPanel ) ||
+		( wp.editPost && wp.editPost.PluginPrePublishPanel );
+
 	if ( ! PluginDocumentSettingPanel ) {
 		return;
+	}
+
+	var sendMode = config.sendMode || 'rules';
+
+	/**
+	 * Label and help for the "no choice" option, per sitewide mode.
+	 *
+	 * @return {Object} { label, help }
+	 */
+	function inheritCopy() {
+		if ( 'opt_in' === sendMode ) {
+			return {
+				label: __( 'Use the site default (don’t send)', 'rss-chat-routing' ),
+				help: __( 'This site sends only posts you include.', 'rss-chat-routing' ),
+			};
+		}
+		if ( 'opt_out' === sendMode ) {
+			return {
+				label: __( 'Use the site default (send)', 'rss-chat-routing' ),
+				help: __( 'This site sends every post you don’t exclude.', 'rss-chat-routing' ),
+			};
+		}
+		if ( 'per_post' === sendMode ) {
+			return {
+				label: __( 'Not chosen yet (won’t send)', 'rss-chat-routing' ),
+				help: __( 'This site asks on every post. Choose Include or Exclude.', 'rss-chat-routing' ),
+			};
+		}
+		return {
+			label: __( 'Use the site default', 'rss-chat-routing' ),
+			help: __( '“Use the site default” follows the format and kind rules in Settings; the other two pin this one post.', 'rss-chat-routing' ),
+		};
 	}
 
 	/**
@@ -64,10 +100,24 @@
 			};
 		}
 
-		if ( config.legacyAll ) {
+		if ( 'opt_out' === sendMode ) {
 			return {
 				send: true,
-				message: __( 'Included: the site currently sends every post.', 'rss-chat-routing' ),
+				message: __( 'Included: the site sends every post you don’t exclude.', 'rss-chat-routing' ),
+			};
+		}
+
+		if ( 'opt_in' === sendMode ) {
+			return {
+				send: false,
+				message: __( 'Not sent: the site sends only posts you include.', 'rss-chat-routing' ),
+			};
+		}
+
+		if ( 'per_post' === sendMode ) {
+			return {
+				send: false,
+				message: __( 'Not sent yet: choose Include or Exclude for this post.', 'rss-chat-routing' ),
 			};
 		}
 
@@ -145,24 +195,30 @@
 			editPost( { meta: next } );
 		}
 
-		return el(
+		var copy = inheritCopy();
+
+		function control() {
+			return el( wp.components.RadioControl, {
+				label: __( 'Send this post to rss.chat', 'rss-chat-routing' ),
+				help: copy.help,
+				selected: current,
+				options: [
+					{ label: copy.label, value: '' },
+					{ label: __( 'Include in RSS Chat', 'rss-chat-routing' ), value: 'include' },
+					{ label: __( 'Exclude from RSS Chat', 'rss-chat-routing' ), value: 'exclude' },
+				],
+				onChange: setValue,
+			} );
+		}
+
+		var sidebar = el(
 			PluginDocumentSettingPanel,
 			{
 				name: 'rss-chat-routing',
 				title: __( 'rss.chat', 'rss-chat-routing' ),
 				className: 'rss-chat-routing-panel',
 			},
-			el( wp.components.RadioControl, {
-				label: __( 'Send this post to rss.chat', 'rss-chat-routing' ),
-				help: __( '“Use the site default” follows the format and kind rules in Settings; the other two pin this one post.', 'rss-chat-routing' ),
-				selected: current,
-				options: [
-					{ label: __( 'Use the site default', 'rss-chat-routing' ), value: '' },
-					{ label: __( 'Include in RSS Chat', 'rss-chat-routing' ), value: 'include' },
-					{ label: __( 'Exclude from RSS Chat', 'rss-chat-routing' ), value: 'exclude' },
-				],
-				onChange: setValue,
-			} ),
+			control(),
 			el(
 				'p',
 				{
@@ -180,6 +236,28 @@
 					{ href: config.settingsUrl },
 					__( 'Site setting', 'rss-chat-routing' )
 				)
+			)
+		);
+
+		// "Ask me on every post": repeat the choice in the pre-publish
+		// checks, open while it's still unmade, so it can't be skipped by
+		// accident. Publishing stays possible; an unchosen post isn't sent.
+		if ( 'per_post' !== sendMode || ! PluginPrePublishPanel ) {
+			return sidebar;
+		}
+
+		return el(
+			wp.element.Fragment,
+			null,
+			sidebar,
+			el(
+				PluginPrePublishPanel,
+				{
+					name: 'rss-chat-routing-prepublish',
+					title: __( 'rss.chat: include or exclude?', 'rss-chat-routing' ),
+					initialOpen: '' === current,
+				},
+				control()
 			)
 		);
 	}

@@ -36,6 +36,14 @@ class Rules {
 	const REPLY_IMPORT_MODES = array( 'legacy', 'webmention', 'disabled' );
 
 	/**
+	 * Sitewide send modes. What happens to a post with no per-post choice:
+	 * "rules" sends it when it matches the default format or kind (stock
+	 * RSS Chat behavior); "opt_in" never sends it; "opt_out" always sends it;
+	 * "per_post" holds it until the author picks include or exclude.
+	 */
+	const SEND_MODES = array( 'rules', 'opt_in', 'opt_out', 'per_post' );
+
+	/**
 	 * Register the option and the per-post meta.
 	 *
 	 * @return void
@@ -92,11 +100,30 @@ class Rules {
 	 */
 	public static function defaults() {
 		return array(
+			'send_mode'      => 'rules',
 			'default_format' => 'chat',
 			'default_kind'   => '',
 			'reply_import'   => 'legacy',
 			'legacy_all'     => false,
 		);
+	}
+
+	/**
+	 * A valid send mode from stored or submitted values. With no explicit
+	 * mode, an install on the retired "send every post" setting reads as
+	 * opt out (the same behavior); anything else reads as rules.
+	 *
+	 * @param array $value Stored or submitted settings.
+	 * @return string
+	 */
+	private static function resolve_send_mode( array $value ) {
+		$mode = isset( $value['send_mode'] ) ? \sanitize_key( $value['send_mode'] ) : '';
+
+		if ( \in_array( $mode, self::SEND_MODES, true ) ) {
+			return $mode;
+		}
+
+		return empty( $value['legacy_all'] ) ? 'rules' : 'opt_out';
 	}
 
 	/**
@@ -122,6 +149,7 @@ class Rules {
 
 		$settings = \wp_parse_args( $stored, self::defaults() );
 
+		$settings['send_mode']      = self::resolve_send_mode( $stored );
 		$settings['default_format'] = \sanitize_key( $settings['default_format'] );
 		$settings['default_kind']   = \sanitize_key( $settings['default_kind'] );
 		$settings['legacy_all']     = ! empty( $settings['legacy_all'] );
@@ -184,6 +212,7 @@ class Rules {
 		// any programmatic round-trip; the settings screen retires it simply
 		// by never submitting the field.
 		return array(
+			'send_mode'      => self::resolve_send_mode( $value ),
 			'default_format' => $format,
 			'default_kind'   => $kind,
 			'reply_import'   => $reply_import,
@@ -234,9 +263,10 @@ class Rules {
 	 *   1. Content rss.chat must never syndicate → false, whatever else says.
 	 *   2. Per-post exclude → false.
 	 *   3. Per-post include → true.
-	 *   4. Inherit → true when the post matches the default format OR the
-	 *      default kind (independent signals, either sends), or the install
-	 *      still runs the un-resaved 0.1.0 "all" mode.
+	 *   4. Inherit → the sitewide send mode decides:
+	 *      opt_out sends, opt_in and per_post hold, and rules sends when the
+	 *      post matches the default format OR the default kind (independent
+	 *      signals, either sends).
 	 *   5. Otherwise false.
 	 *
 	 * @param \WP_Post|null $post The post.
@@ -266,10 +296,24 @@ class Rules {
 
 		$settings = self::settings();
 
-		if ( $settings['legacy_all'] ) {
+		if ( 'opt_out' === $settings['send_mode'] ) {
 			return array(
 				'send'   => true,
-				'reason' => 'legacy-all',
+				'reason' => $settings['legacy_all'] ? 'legacy-all' : 'opt-out-default',
+			);
+		}
+
+		if ( 'opt_in' === $settings['send_mode'] ) {
+			return array(
+				'send'   => false,
+				'reason' => 'opt-in-default',
+			);
+		}
+
+		if ( 'per_post' === $settings['send_mode'] ) {
+			return array(
+				'send'   => false,
+				'reason' => 'needs-choice',
 			);
 		}
 
