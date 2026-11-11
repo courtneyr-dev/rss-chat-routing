@@ -1,0 +1,7 @@
+/* Starlight's search button shows a "Ctrl K" hint as visible text that isn't
+   in its accessible name ("Search"), which fails WCAG 2.5.3 Label in Name
+   (axe label-content-name-mismatch). The shortcut still works and is still
+   exposed to assistive tech through aria-keyshortcuts. */
+button[data-open-modal] kbd {
+	display: none;
+}

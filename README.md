@@ -2,6 +2,24 @@
 
 Chooses which posts go to [rss.chat](https://rss.chat) (opt in, opt out, by post format and Post Kind, or ask on every post) and brings replies home as real, verified Webmentions.
 
+## Documentation
+
+The full docs live at **[courtneyr-dev.github.io/rss-chat-routing](https://courtneyr-dev.github.io/rss-chat-routing/)**:
+
+- [Send your first post to rss.chat](https://courtneyr-dev.github.io/rss-chat-routing/tutorial/first-post/): a step-by-step tutorial from install to first post.
+- [How-to guides](https://courtneyr-dev.github.io/rss-chat-routing/how-to/choose-when-posts-send/): choosing when posts are sent, holding one post, routing by format or kind, replies as Webmentions, upgrading, and troubleshooting.
+- [Reference](https://courtneyr-dev.github.io/rss-chat-routing/reference/settings/): every setting, the routing decision and its reason codes, the per-post field for REST and Micropub, and compatibility.
+- [Explanation](https://courtneyr-dev.github.io/rss-chat-routing/explanation/why-routing-is-separate/): why routing is a separate plugin and how replies come home.
+
+For rss.chat itself, see the official sources:
+
+- [rss.chat](https://rss.chat/) and its launch post, [Introducing rss.chat](http://scripting.com/2026/07/10/161133.html)
+- [RSS as a social network](https://source.scripting.com/social.opml) and the [`source` namespace](https://source.scripting.com/)
+- Server and client docs in [scripting/rss.chat](https://github.com/scripting/rss.chat), including the [server API](https://github.com/scripting/rss.chat/blob/main/server/docs/api.md)
+- The [RSS Chat WordPress plugin](https://github.com/pfefferle/wordpress-rss-chat) this plugin works with
+
+The docs site is built from `docs/` with Astro Starlight and deployed to GitHub Pages by `.github/workflows/docs.yml`.
+
 ## Why
 
 [RSS Chat](https://github.com/pfefferle/wordpress-rss-chat) syndicates a post when it carries the core `chat` post format:
