@@ -9,3 +9,5 @@
 /phpcs.xml
 /phpunit.xml.dist
 .DS_Store
+/docs
+/documentation-plan.md

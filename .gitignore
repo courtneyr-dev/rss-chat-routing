@@ -2,3 +2,8 @@
 /node_modules/
 .DS_Store
 /.phpunit.result.cache
+
+# Docs site build output (docs/ is an Astro Starlight project)
+docs/dist/
+docs/.astro/
+docs/node_modules/

@@ -1,0 +1,62 @@
+import { defineConfig } from 'astro/config';
+import starlight from '@astrojs/starlight';
+import meta from './src/site-meta.mjs';
+
+export default defineConfig({
+	site: meta.site,
+	base: meta.base,
+	integrations: [
+		starlight({
+			title: `${meta.name} documentation`,
+			description: meta.description,
+			favicon: '/favicon.svg',
+			logo: { src: './src/assets/site-icon.svg', alt: '' },
+			social: [
+				{ icon: 'github', label: 'GitHub repository', href: meta.github },
+				...(meta.wporg
+					? [{ icon: 'puzzle', label: 'WordPress.org listing', href: meta.wporg }]
+					: []),
+				{ icon: 'warning', label: 'Report an issue', href: `${meta.github}/issues` },
+			],
+			editLink: { baseUrl: `${meta.github}/edit/main/docs/` },
+			lastUpdated: true,
+			customCss: ['./src/styles/custom.css'],
+			head: [{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary' } }],
+			components: {
+				PageTitle: './src/components/Breadcrumbs.astro',
+				Head: './src/components/Head.astro',
+			},
+			sidebar: [
+				{
+					label: 'Start here',
+					items: ['tutorial/first-post'],
+				},
+				{
+					label: 'How-to guides',
+					items: [
+						'how-to/choose-when-posts-send',
+						'how-to/send-or-hold-one-post',
+						'how-to/route-by-format-or-kind',
+						'how-to/get-replies-as-webmentions',
+						'how-to/upgrade-from-0-1-or-chat-format',
+						'how-to/find-out-why-a-post-did-not-send',
+					],
+				},
+				{
+					label: 'Reference',
+					items: [
+						'reference/settings',
+						'reference/routing-decision',
+						'reference/per-post-field',
+						'reference/compatibility',
+						'reference/rss-chat-resources',
+					],
+				},
+				{
+					label: 'Explanation',
+					items: ['explanation/why-routing-is-separate', 'explanation/how-replies-come-home'],
+				},
+			],
+		}),
+	],
+});
