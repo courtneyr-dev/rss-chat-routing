@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Public `rss-chat-routing/get-route` and opt-in `rss-chat-routing/set-route` abilities for
+  reading and changing a post's rss.chat route through the WordPress Abilities API.
+
 ## [0.3.0] - 2026-11-11
 
 ### Added

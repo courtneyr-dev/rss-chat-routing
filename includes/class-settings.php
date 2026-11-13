@@ -191,6 +191,26 @@ class Settings {
 					<?php endif; ?>
 				<?php endif; ?>
 
+				<?php if ( Abilities::is_available() ) : ?>
+					<h2><?php echo \esc_html__( 'Agent abilities', 'rss-chat-routing' ); ?></h2>
+					<p>
+						<input
+							type="hidden"
+							name="<?php echo \esc_attr( Abilities::OPTION_SET_ROUTE ); ?>"
+							value="0"
+						/>
+						<label>
+							<input
+								type="checkbox"
+								name="<?php echo \esc_attr( Abilities::OPTION_SET_ROUTE ); ?>"
+								value="1"
+								<?php \checked( Abilities::set_route_enabled() ); ?>
+							/>
+							<?php echo \esc_html__( "Let agents change a post's rss.chat route (include, exclude or follow the site rules).", 'rss-chat-routing' ); ?>
+						</label>
+					</p>
+				<?php endif; ?>
+
 				<?php \submit_button(); ?>
 			</form>
 		</div>
