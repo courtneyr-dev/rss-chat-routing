@@ -67,6 +67,16 @@ Micropub clients (Outpost among them) can send the override as `mp-rss-chat-rout
 
 **Permalinks.** Every pushed item carries the post's canonical WordPress permalink in the rss.chat item's `link` field, which is what lets the server point a reply's Webmention back at the right post.
 
+## Abilities
+
+RSS Chat Routing registers these WordPress abilities when the Abilities API is available:
+
+- `rss-chat-routing/get-route` reads a post's routing decision and settings. It requires the
+  `edit_post` capability for that post and has no switch because it is a read ability.
+- `rss-chat-routing/set-route` changes a post's stored route for its next publish or update. It
+  requires the `edit_post` capability for that post. Its switch is the
+  `rss_chat_routing_ability_set_route` option, and the switch defaults to off.
+
 ## Migrating from 0.1.x
 
 Nothing to do. The old `format` / `all` / `none` option shape is read in place: `format` becomes the chat default format, `none` becomes no defaults, and the first ticked kind becomes the default kind. An install still on `all` reads as *Every post unless I opt it out*, so it keeps sending everything, and saving the screen keeps whichever mode is selected. Stored per-post choices (`1`/`0`) keep their meaning forever. Settings changes only affect future publishes; nothing is bulk-syndicated, and excluding an already-synced post neither deletes nor re-sends the remote item.

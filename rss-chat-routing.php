@@ -25,6 +25,7 @@ const VERSION = '0.3.0';
 const FILE    = __FILE__;
 
 require_once __DIR__ . '/includes/class-rules.php';
+require_once __DIR__ . '/includes/class-abilities.php';
 require_once __DIR__ . '/includes/class-router.php';
 require_once __DIR__ . '/includes/class-link-shim.php';
 require_once __DIR__ . '/includes/class-comment-gate.php';
@@ -40,6 +41,7 @@ require_once __DIR__ . '/includes/class-editor.php';
  */
 function bootstrap() {
 	Rules::init();
+	Abilities::init();
 	Settings::init();
 	Micropub::init();
 
