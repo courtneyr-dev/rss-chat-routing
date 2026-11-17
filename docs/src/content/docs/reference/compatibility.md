@@ -1,6 +1,6 @@
 ---
 title: Compatibility
-description: "What RSS Chat Routing 0.3.0 requires, which plugins it works with, and which RSS Chat filters it answers."
+description: "What RSS Chat Routing 0.4.0 requires, which plugins it works with, and which RSS Chat filters it answers."
 ---
 
 ## Requirements
@@ -12,6 +12,8 @@ description: "What RSS Chat Routing 0.3.0 requires, which plugins it works with,
 | [RSS Chat](https://github.com/pfefferle/wordpress-rss-chat) | required; the test suite runs against its `main` branch |
 
 Without RSS Chat active, the settings screen shows a warning and nothing is sent.
+
+The two agent abilities (`get-route`, `set-route`) need the WordPress Abilities API, which ships in WordPress 6.9. On older versions the plugin works as before without them.
 
 ## Optional plugins
 

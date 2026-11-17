@@ -71,11 +71,15 @@ Micropub clients (Outpost among them) can send the override as `mp-rss-chat-rout
 
 RSS Chat Routing registers these WordPress abilities when the Abilities API is available:
 
-- `rss-chat-routing/get-route` reads a post's routing decision and settings. It requires the
-  `edit_post` capability for that post and has no switch because it is a read ability.
-- `rss-chat-routing/set-route` changes a post's stored route for its next publish or update. It
-  requires the `edit_post` capability for that post. Its switch is the
-  `rss_chat_routing_ability_set_route` option, and the switch defaults to off.
+| Ability | Capability | Switch | Default | MCP public |
+|---|---|---|---|---|
+| `rss-chat-routing/get-route` | `edit_post` on the post | none (read only) | always on | yes |
+| `rss-chat-routing/set-route` | `edit_post` on the post | `rss_chat_routing_ability_set_route` | off | no |
+
+- `get-route` returns the post's routing decision and reason, its stored override, and the site's send mode and defaults.
+- `set-route` takes a route of `include`, `exclude` or `inherit` and changes where the post's *next* publish or update goes. It sends nothing now and never calls `wp_update_post()`. It dry-runs unless you pass `dry_run: false`.
+- `set-route` accepts only posts of the `post` type, the only type the plugin routes. `get-route` accepts any existing post you can edit.
+- Turn the switch on under **Settings → RSS Chat Routing → Agent abilities**. While it's off, set-route returns a `rss_chat_routing_ability_disabled` error (HTTP 403) and writes nothing. Both abilities register on every request, whatever the switch says, and need WordPress 6.9 or later.
 
 ## Migrating from 0.1.x
 
