@@ -7,10 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-16
+
 ### Added
 
-- Public `rss-chat-routing/get-route` and opt-in `rss-chat-routing/set-route` abilities for
-  reading and changing a post's rss.chat route through the WordPress Abilities API.
+- Two WordPress Abilities API abilities, registered only when the Abilities API is available
+  (WordPress 6.9 or later):
+  - `rss-chat-routing/get-route` reads a post's routing decision, its stored override, and the
+    site defaults. It needs `edit_post` on that post and is public to MCP.
+  - `rss-chat-routing/set-route` changes a post's stored route (include, exclude, or follow the
+    site rules) for its next publish or update. It never sends anything now. It dry-runs unless
+    `dry_run` is false, needs `edit_post` on that post, isn't public to MCP, and stays off until
+    you tick its box.
+- An **Agent abilities** section on Settings → RSS Chat Routing with the set-route switch
+  (`rss_chat_routing_ability_set_route`, off by default).
+
+### Fixed
+
+- `set-route` accepts only posts of the `post` type. A revision id used to pass the parent's
+  `edit_post` check, write the parent's route, and report the revision's.
+- The set-route switch reads only `true`, `1` and `"1"` as on, so a stored `"no"` or `"off"`
+  no longer turns it on, and a `dry_run` of `"false"` is no longer read as true, so it writes.
 
 ## [0.3.0] - 2026-11-11
 
@@ -56,12 +73,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Route posts to rss.chat without requiring the core `chat` post format.
 
-No git tags exist for these releases yet, so the links below point at commit ranges
-rather than tag comparisons. [Unreleased] and [0.2.2] both end at this branch's tip
-(neither is tagged yet) rather than a fixed commit, so they keep resolving correctly
-as work continues here.
+The 0.4.0 links use the `v0.4.0` tag. No git tags exist for the earlier releases yet, so
+their links point at commit ranges rather than tag comparisons. [0.3.0] and [0.2.2] both end
+at a branch tip (neither is tagged yet) rather than a fixed commit, so they keep resolving
+correctly as work continues here.
 
-[Unreleased]: https://github.com/courtneyr-dev/rss-chat-routing/compare/462ff8186c48252a48f704add62accbabf5edc57...feat/send-mode
+[Unreleased]: https://github.com/courtneyr-dev/rss-chat-routing/compare/v0.4.0...main
+[0.4.0]: https://github.com/courtneyr-dev/rss-chat-routing/compare/6d2caf5...v0.4.0
 [0.3.0]: https://github.com/courtneyr-dev/rss-chat-routing/compare/462ff8186c48252a48f704add62accbabf5edc57...feat/send-mode
 [0.2.2]: https://github.com/courtneyr-dev/rss-chat-routing/compare/9deab4c9a66ffaf22b16c79625dd6333d0b9e04b...fix/0.2.2-sanitize-backfeed
 [0.2.1]: https://github.com/courtneyr-dev/rss-chat-routing/compare/58d12b9bba04dcda8c40183a98f65d07a817ba68...9deab4c9a66ffaf22b16c79625dd6333d0b9e04b

@@ -30,7 +30,7 @@ Each post also gets an **rss.chat** panel in the editor sidebar, where an Includ
 
 ## Requirements
 
-Version 0.3.0 needs WordPress 6.6 or later, PHP 7.4 or later, and the RSS Chat plugin. Post Kinds for IndieWeb and the Webmention plugin are optional. Details: [Compatibility](/rss-chat-routing/reference/compatibility/).
+Version 0.4.0 needs WordPress 6.6 or later, PHP 7.4 or later, and the RSS Chat plugin. Post Kinds for IndieWeb and the Webmention plugin are optional. Details: [Compatibility](/rss-chat-routing/reference/compatibility/).
 
 ## Source code and help
 

@@ -54,6 +54,16 @@ How replies on rss.chat come back to your site.
 
 Default: `legacy`. Before choosing `webmention`, read [Get replies as Webmentions](/rss-chat-routing/how-to/get-replies-as-webmentions/): rss.chat servers don't send Webmentions yet.
 
+## Agent abilities
+
+Shown when the WordPress Abilities API is available (WordPress 6.9 or later).
+
+| Screen label | Stored option | Default |
+|---|---|---|
+| Let agents change a post's rss.chat route (include, exclude or follow the site rules). | `rss_chat_routing_ability_set_route` | off |
+
+While it's off, the `rss-chat-routing/set-route` ability returns an error and writes nothing. The read ability, `rss-chat-routing/get-route`, needs no switch. This option is stored on its own, not inside `rss_chat_routing`.
+
 ## Stored option example
 
 ```json

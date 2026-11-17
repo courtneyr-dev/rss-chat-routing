@@ -9,7 +9,7 @@ export default {
 		'Documentation for RSS Chat Routing: choose which WordPress posts go to rss.chat and bring replies home as verified Webmentions.',
 	github: 'https://github.com/courtneyr-dev/rss-chat-routing',
 	wporg: '',
-	version: '0.3.0',
+	version: '0.4.0',
 	requiresWP: '6.6',
 	requiresPHP: '7.4',
 	author: 'Courtney Robertson',
