@@ -134,7 +134,7 @@ class Abilities {
 	 * @return bool
 	 */
 	public static function can_get_route( $input ) {
-		return self::can_edit_input_post( $input );
+		return self::can_edit_input_post( $input, false );
 	}
 
 	/**
@@ -148,7 +148,7 @@ class Abilities {
 			return self::disabled_error();
 		}
 
-		return self::can_edit_input_post( $input );
+		return self::can_edit_input_post( $input, true );
 	}
 
 	/**
@@ -222,16 +222,27 @@ class Abilities {
 	/**
 	 * Check edit_post for the existing post named by the ability input.
 	 *
-	 * Only the `post` type is routable, and the route meta is registered for it
-	 * alone, so revisions, pages and other types fail permission.
+	 * Reads accept any existing post row, as the spec says. Writes also require
+	 * the `post` type, the only one the route meta is registered for, so a
+	 * revision id (which maps to its parent's capabilities) can't write the
+	 * parent's meta and pages can't collect a stray meta row.
 	 *
-	 * @param mixed $input Ability input.
+	 * @param mixed $input     Ability input.
+	 * @param bool  $post_only Whether the post must be of the `post` type.
 	 * @return bool
 	 */
-	private static function can_edit_input_post( $input ) {
+	private static function can_edit_input_post( $input, $post_only ) {
 		$post_id = \is_array( $input ) && isset( $input['post_id'] ) ? (int) $input['post_id'] : 0;
 
-		return $post_id > 0 && 'post' === \get_post_type( $post_id ) && \current_user_can( 'edit_post', $post_id );
+		if ( $post_id <= 0 || null === \get_post( $post_id ) ) {
+			return false;
+		}
+
+		if ( $post_only && 'post' !== \get_post_type( $post_id ) ) {
+			return false;
+		}
+
+		return \current_user_can( 'edit_post', $post_id );
 	}
 
 	/**

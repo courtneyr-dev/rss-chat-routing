@@ -426,18 +426,22 @@ class Test_Abilities extends \WP_UnitTestCase {
 			\update_option( Abilities::OPTION_SET_ROUTE, $value );
 
 			$this->assertFalse( Abilities::set_route_enabled(), 'Stored value ' . \wp_json_encode( $value ) . ' must read as off.' );
-			$this->assertWPError( Abilities::can_set_route( $input ) );
+			$error = Abilities::can_set_route( $input );
+			$this->assertWPError( $error );
+			$this->assertSame( 'rss_chat_routing_ability_disabled', $error->get_error_code() );
 		}
 
 		foreach ( array( true, 1, '1' ) as $value ) {
+			// Delete first so each write reaches the database and the options cache.
+			\delete_option( Abilities::OPTION_SET_ROUTE );
 			\update_option( Abilities::OPTION_SET_ROUTE, $value );
 			$this->assertTrue( Abilities::set_route_enabled(), 'Stored value ' . \wp_json_encode( $value ) . ' must read as on.' );
 		}
 	}
 
 	/**
-	 * Revisions, pages and other users' posts fail permission, and a denied
-	 * execute writes nothing.
+	 * Revisions and pages fail set-route permission but not the read, other
+	 * users' posts fail for a contributor, and a denied execute writes nothing.
 	 */
 	public function test_permission_rejects_non_posts_and_denied_execute_writes_nothing() {
 		$administrator = self::factory()->user->create( array( 'role' => 'administrator' ) );
@@ -473,7 +477,7 @@ class Test_Abilities extends \WP_UnitTestCase {
 
 		$this->assertGreaterThan( 0, (int) $revision_id );
 		foreach ( array( $page_id, (int) $revision_id ) as $id ) {
-			$this->assertFalse( $get->check_permissions( array( 'post_id' => $id ) ) );
+			$this->assertTrue( $get->check_permissions( array( 'post_id' => $id ) ) );
 			$this->assertFalse(
 				$set->check_permissions(
 					array(
