@@ -187,7 +187,7 @@ class Abilities {
 		$post_id         = (int) $input['post_id'];
 		$override_before = Rules::override( $post_id );
 		$override_after  = Rules::sanitize_override( $input['route'] );
-		$dry_run         = ! \array_key_exists( 'dry_run', $input ) || (bool) $input['dry_run'];
+		$dry_run         = ! \array_key_exists( 'dry_run', $input ) || \rest_sanitize_boolean( $input['dry_run'] );
 
 		if ( ! $dry_run ) {
 			if ( '' === $override_after ) {
@@ -216,11 +216,14 @@ class Abilities {
 	 * @return bool
 	 */
 	public static function set_route_enabled() {
-		return (bool) \rest_sanitize_boolean( \get_option( self::OPTION_SET_ROUTE, false ) );
+		return \in_array( \get_option( self::OPTION_SET_ROUTE, false ), array( true, 1, '1' ), true );
 	}
 
 	/**
 	 * Check edit_post for the existing post named by the ability input.
+	 *
+	 * Only the `post` type is routable, and the route meta is registered for it
+	 * alone, so revisions, pages and other types fail permission.
 	 *
 	 * @param mixed $input Ability input.
 	 * @return bool
@@ -228,7 +231,7 @@ class Abilities {
 	private static function can_edit_input_post( $input ) {
 		$post_id = \is_array( $input ) && isset( $input['post_id'] ) ? (int) $input['post_id'] : 0;
 
-		return $post_id > 0 && null !== \get_post( $post_id ) && \current_user_can( 'edit_post', $post_id );
+		return $post_id > 0 && 'post' === \get_post_type( $post_id ) && \current_user_can( 'edit_post', $post_id );
 	}
 
 	/**
