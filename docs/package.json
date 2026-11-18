@@ -21,5 +21,11 @@
     "linkinator": "^8.1.0",
     "markdownlint-cli2": "^0.24.1",
     "playwright": "^1.65.1"
+  },
+  "overrides": {
+    "micromark-extension-math": {
+      "katex": "0.18.9"
+    },
+    "minimatch@>=7.0.0 <11.0.1": "11.0.5"
   }
 }
