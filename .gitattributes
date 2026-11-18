@@ -1,0 +1,19 @@
+# export-ignore keeps development files out of GitHub's source zips and
+# git archive. The list mirrors .distignore, which decides what ships to
+# WordPress.org.
+/.git export-ignore
+/.github export-ignore
+/.gitignore export-ignore
+/.distignore export-ignore
+/tests export-ignore
+/vendor export-ignore
+/composer.json export-ignore
+/composer.lock export-ignore
+/phpcs.xml export-ignore
+/phpunit.xml.dist export-ignore
+.DS_Store export-ignore
+/docs export-ignore
+/documentation-plan.md export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+.distignore export-ignore
