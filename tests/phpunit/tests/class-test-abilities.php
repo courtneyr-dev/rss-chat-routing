@@ -92,30 +92,35 @@ class Test_Abilities extends \WP_UnitTestCase {
 
 		$this->assertSame( Abilities::CATEGORY, $get->get_category() );
 		$this->assertSame( Abilities::CATEGORY, $set->get_category() );
-		$this->assertSame(
-			array(
-				'annotations'  => array(
-					'readonly'    => true,
-					'destructive' => false,
-					'idempotent'  => true,
-				),
-				'show_in_rest' => true,
-				'mcp'          => array( 'public' => true ),
+		$expected_get = array(
+			'annotations'  => array(
+				'readonly'    => true,
+				'destructive' => false,
+				'idempotent'  => true,
 			),
-			$get->get_meta()
+			'show_in_rest' => true,
+			'mcp'          => array( 'public' => true ),
 		);
-		$this->assertSame(
-			array(
-				'annotations'  => array(
-					'readonly'    => false,
-					'destructive' => false,
-					'idempotent'  => true,
-				),
-				'show_in_rest' => true,
-				'mcp'          => array( 'public' => false ),
+		$expected_set = array(
+			'annotations'  => array(
+				'readonly'    => false,
+				'destructive' => false,
+				'idempotent'  => true,
 			),
-			$set->get_meta()
+			'show_in_rest' => true,
+			'mcp'          => array( 'public' => false ),
 		);
+
+		// WordPress 7.1 normalizes every ability's meta with a top-level
+		// `public` flag (default false; it only seeds `show_in_rest`, which
+		// these abilities set explicitly). Earlier versions don't add it.
+		if ( \array_key_exists( 'public', $get->get_meta() ) ) {
+			$expected_get['public'] = false;
+			$expected_set['public'] = false;
+		}
+
+		$this->assertSame( $expected_get, $get->get_meta() );
+		$this->assertSame( $expected_set, $set->get_meta() );
 	}
 
 	/**
