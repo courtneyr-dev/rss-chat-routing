@@ -10,6 +10,7 @@ namespace RSS_Chat_Routing\Tests;
 
 use WP_UnitTestCase;
 use RSS_Chat\Plugin;
+use RSS_Chat_Routing\Editor;
 use RSS_Chat_Routing\Rules;
 
 /**
@@ -23,6 +24,57 @@ class Test_Routing extends WP_UnitTestCase {
 	 * @var string[]
 	 */
 	private $newposts = array();
+
+	/**
+	 * Quick Edit persists the same override and does not send a draft.
+	 */
+	public function test_quick_edit_route_save(): void {
+		$admin   = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		$post_id = self::factory()->post->create( array( 'post_status' => 'draft' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Save the original test request for restoration.
+		$saved_post = $_POST;
+		$saved_user = \get_current_user_id();
+
+		\wp_set_current_user( $admin );
+		\add_filter( 'wp_doing_ajax', '__return_true' );
+		try {
+			$_POST = array(
+				'action'                 => 'inline-save',
+				'_inline_edit'           => \wp_create_nonce( 'inlineeditnonce' ),
+				'rss_chat_routing_route' => 'include',
+			);
+			Editor::save_quick_edit( $post_id );
+			$this->assertSame( 'include', Rules::override( $post_id ) );
+			$this->assertSame( array(), $this->newposts );
+
+			$_POST['rss_chat_routing_route'] = 'exclude';
+			$_POST['_inline_edit']           = 'invalid';
+			Editor::save_quick_edit( $post_id );
+			$this->assertSame( 'include', Rules::override( $post_id ) );
+
+			$_POST['_inline_edit']           = \wp_create_nonce( 'inlineeditnonce' );
+			$_POST['rss_chat_routing_route'] = '';
+			Editor::save_quick_edit( $post_id );
+			$this->assertSame( '', Rules::override( $post_id ) );
+			$this->assertFalse( \metadata_exists( 'post', $post_id, Rules::META_KEY ) );
+			$this->assertSame( array(), $this->newposts );
+
+			\update_option( Rules::OPTION, array( 'send_mode' => 'opt_out' ) );
+			$_POST['rss_chat_routing_route'] = 'exclude';
+			\wp_update_post(
+				array(
+					'ID'          => $post_id,
+					'post_status' => 'publish',
+				)
+			);
+			$this->assertSame( 'exclude', Rules::override( $post_id ) );
+			$this->assertSame( array(), $this->newposts );
+		} finally {
+			$_POST = $saved_post;
+			\wp_set_current_user( $saved_user );
+			\remove_filter( 'wp_doing_ajax', '__return_true' );
+		}
+	}
 
 	/**
 	 * Connect an account, register a kind taxonomy, stub the network.
