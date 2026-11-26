@@ -43,6 +43,7 @@ function bootstrap() {
 	Rules::init();
 	Abilities::init();
 	Settings::init();
+	\add_action( 'admin_menu', array( Editor::class, 'add_preview_page' ) );
 	Micropub::init();
 
 	if ( ! is_parent_active() ) {

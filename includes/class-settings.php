@@ -54,7 +54,7 @@ class Settings {
 
 		$settings = Rules::settings();
 		$kinds    = self::kind_terms();
-		$status   = \class_exists( __NAMESPACE__ . '\\Reply_Import' ) ? Reply_Import::status() : null;
+		$status   = Reply_Import::status();
 		?>
 		<div class="wrap">
 			<h1><?php echo \esc_html__( 'RSS Chat Routing', 'rss-chat-routing' ); ?></h1>
@@ -178,17 +178,30 @@ class Settings {
 					<?php endforeach; ?>
 				</fieldset>
 
-				<?php if ( $status && 'webmention' === $status['mode'] ) : ?>
-					<?php if ( ! $status['webmention_plugin_active'] ) : ?>
-						<div class="notice notice-error inline">
-							<p><?php echo \esc_html__( 'Webmention mode is selected but the Webmention plugin is not active — no replies are arriving.', 'rss-chat-routing' ); ?></p>
-						</div>
+				<h3><?php \esc_html_e( 'Webmention switch preview', 'rss-chat-routing' ); ?></h3>
+				<ul class="ul-disc">
+					<li><?php echo $status['webmention_plugin_active'] ? \esc_html__( 'The Webmention plugin is active.', 'rss-chat-routing' ) : \esc_html__( 'The Webmention plugin is inactive.', 'rss-chat-routing' ); ?></li>
+					<li><?php echo $status['server_support_confirmed'] ? \esc_html__( 'The configured rss.chat server supports Webmentions.', 'rss-chat-routing' ) : \esc_html__( 'Webmention support on the configured rss.chat server is unconfirmed.', 'rss-chat-routing' ); ?></li>
+					<?php if ( is_parent_active() ) : ?>
+						<li>
+							<?php
+							printf(
+								/* translators: 1: local reply records checked, 2: groups sharing a source. */
+								\esc_html__( 'Local reply records checked: %1$s. Same-post source groups with multiple records, including a legacy reply: %2$s.', 'rss-chat-routing' ),
+								\esc_html( \number_format_i18n( $status['local_duplicates']['checked'] ) ),
+								\esc_html( \number_format_i18n( $status['local_duplicates']['duplicate_groups'] ) )
+							);
+							?>
+							<?php if ( $status['local_duplicates']['limited'] ) : ?>
+								<?php \esc_html_e( 'The preview checks the newest 250 records with source metadata.', 'rss-chat-routing' ); ?>
+							<?php endif; ?>
+						</li>
 					<?php endif; ?>
-					<?php if ( ! $status['server_support_confirmed'] ) : ?>
-						<div class="notice notice-warning inline">
-							<p><?php echo \esc_html__( 'The configured rss.chat server has not confirmed Webmention support. Until a server version ships it, replies will not arrive in this mode — the legacy importer stays available.', 'rss-chat-routing' ); ?></p>
-						</div>
-					<?php endif; ?>
+				</ul>
+				<?php if ( 'webmention' === $status['mode'] && ( ! $status['webmention_plugin_active'] || ! $status['server_support_confirmed'] ) ) : ?>
+					<div class="notice notice-warning inline">
+						<p><?php \esc_html_e( 'Webmention mode is selected. Reply delivery requires the Webmention plugin and support from the configured rss.chat server.', 'rss-chat-routing' ); ?></p>
+					</div>
 				<?php endif; ?>
 
 				<?php if ( Abilities::is_available() ) : ?>

@@ -94,15 +94,53 @@ class Router {
 	 */
 	public static function open_for_feed() {
 		$post = \get_post();
-
-		if ( ! $post instanceof \WP_Post ) {
-			return;
+		if ( $post instanceof \WP_Post && '' !== self::delivery_id( $post->ID ) ) {
+			self::engage( $post->ID, true );
 		}
-		if ( '' === (string) \get_post_meta( $post->ID, '_rss_chat_id', true ) ) {
-			return;
+	}
+
+	/**
+	 * Read the parent’s saved remote item ID.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return string
+	 */
+	public static function delivery_id( $post_id ) {
+		return (string) \get_post_meta( $post_id, \RSS_Chat\Plugin::META_ID, true );
+	}
+
+	/**
+	 * Describe RSS2 provenance using saved public data. The parent renders
+	 * the markdown body only in the feed, where content filters can run.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return array|null
+	 */
+	public static function feed_provenance( $post ) {
+		if ( ! Rules::is_eligible( $post ) ) {
+			return null;
 		}
 
-		self::engage( $post->ID, true );
+		$has_receipt = '' !== self::delivery_id( $post->ID );
+		if ( ! $has_receipt && 'chat' !== \get_post_format( $post ) ) {
+			return null;
+		}
+
+		// Match the parent’s RSS2 reply count: approved replies, excluding likes.
+		$count = 0 === (int) $post->comment_count ? 0 : (int) \get_comments(
+			array(
+				'post_id' => $post->ID,
+				'type'    => 'comment',
+				'status'  => 'approve',
+				'count'   => true,
+			)
+		);
+
+		return array(
+			'origin'         => $has_receipt ? 'delivery' : 'chat',
+			'comments_count' => $count,
+			'comments_url'   => \get_post_comments_feed_link( $post->ID ),
+		);
 	}
 
 	/**

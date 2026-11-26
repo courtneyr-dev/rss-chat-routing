@@ -165,17 +165,23 @@ class Reply_Import {
 	 * @return string[]
 	 */
 	private static function source_spellings( $source ) {
-		$spellings = array( $source );
+		$guid = self::source_guid( $source );
+		return $guid === $source ? array( $source ) : array( $source, $guid );
+	}
 
+	/**
+	 * Use the same source identity when comparing saved replies.
+	 *
+	 * @param string $source Webmention source URL or stored GUID.
+	 * @return string
+	 */
+	private static function source_guid( $source ) {
 		$parts = \wp_parse_url( $source );
 		if ( isset( $parts['path'], $parts['query'] ) && '/item' === $parts['path'] ) {
-			$guid = \str_replace( '/item?', '/?', $source );
-			if ( $guid !== $source ) {
-				$spellings[] = $guid;
-			}
+			return \str_replace( '/item?', '/?', $source );
 		}
 
-		return $spellings;
+		return $source;
 	}
 
 	/**
@@ -201,17 +207,84 @@ class Reply_Import {
 	}
 
 	/**
-	 * What webmention mode actually has to work with, reported honestly.
+	 * Summarize recent local source matches without contacting the server.
 	 *
-	 * @return array{mode: string, webmention_plugin_active: bool, server_support_confirmed: bool}
+	 * @return array{checked: int, duplicate_groups: int, limited: bool}
+	 */
+	private static function local_duplicates() {
+		$summary = array(
+			'checked'          => 0,
+			'duplicate_groups' => 0,
+			'limited'          => false,
+		);
+		if ( ! is_parent_active() ) {
+			return $summary;
+		}
+
+		$limit     = 250;
+		$protocols = self::legacy_protocols();
+		$comments  = \get_comments(
+			array(
+				'status'     => 'any',
+				'number'     => $limit + 1,
+				'orderby'    => 'comment_ID',
+				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					'relation' => 'OR',
+					array(
+						'relation' => 'AND',
+						array(
+							'key'     => \RSS_Chat\Plugin::META_PROTOCOL,
+							'value'   => $protocols,
+							'compare' => 'IN',
+						),
+						array(
+							'key'     => \RSS_Chat\Plugin::META_GUID,
+							'compare' => 'EXISTS',
+						),
+					),
+					array(
+						'key'     => 'webmention_source_url',
+						'compare' => 'EXISTS',
+					),
+				),
+			)
+		);
+
+		$summary['limited'] = \count( $comments ) > $limit;
+		$groups             = array();
+		foreach ( \array_slice( $comments, 0, $limit ) as $comment ) {
+			$id     = $comment->comment_ID;
+			$legacy = \in_array( \get_comment_meta( $id, \RSS_Chat\Plugin::META_PROTOCOL, true ), $protocols, true );
+			$source = \get_comment_meta( $id, $legacy ? \RSS_Chat\Plugin::META_GUID : 'webmention_source_url', true );
+			if ( ! \is_string( $source ) || '' === $source ) {
+				continue;
+			}
+			$key                      = $comment->comment_post_ID . ':' . self::source_guid( $source );
+			$groups[ $key ]['count']  = ( $groups[ $key ]['count'] ?? 0 ) + 1;
+			$groups[ $key ]['legacy'] = $legacy || ! empty( $groups[ $key ]['legacy'] );
+			++$summary['checked'];
+		}
+
+		foreach ( $groups as $group ) {
+			if ( $group['legacy'] && $group['count'] > 1 ) {
+				++$summary['duplicate_groups'];
+			}
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * What webmention mode has to work with on the current site.
+	 *
+	 * @return array
 	 */
 	public static function status() {
 		return array(
 			'mode'                     => Rules::settings()['reply_import'],
 			'webmention_plugin_active' => \class_exists( '\\Webmention\\Receiver' ) || \function_exists( 'webmention_init' ),
-			// No released rss.chat server sends Webmentions yet. Flip this
-			// to a real capability probe once a server version ships it.
 			'server_support_confirmed' => false,
+			'local_duplicates'         => self::local_duplicates(),
 		);
 	}
 }

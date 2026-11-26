@@ -475,4 +475,57 @@ class Test_Reply_Import extends WP_UnitTestCase {
 		$this->assertFalse( $status['webmention_plugin_active'] );
 		$this->assertFalse( $status['server_support_confirmed'] );
 	}
+
+	/**
+	 * Preview groups both source spellings per post, including held records.
+	 */
+	public function test_switch_preview_isolated_from_mode_comments_cron_and_http() {
+		$this->set_mode( 'legacy' );
+		$guid = 'https://rss.example/?id=778';
+		self::factory()->comment->create(
+			array(
+				'comment_post_ID' => $this->synced_post,
+				'comment_meta'    => array(
+					Plugin::META_GUID     => $guid,
+					Plugin::META_PROTOCOL => 'rsschat',
+				),
+			)
+		);
+		$mention = array(
+			'comment_post_ID'  => $this->synced_post,
+			'comment_approved' => '0',
+			'comment_meta'     => array( 'webmention_source_url' => 'https://rss.example/item?id=778' ),
+		);
+		self::factory()->comment->create( $mention );
+		$mention['comment_post_ID'] = self::factory()->post->create();
+		self::factory()->comment->create( $mention );
+
+		$before_cron     = \get_option( 'cron' );
+		$before_settings = \get_option( Rules::OPTION );
+		$before_comments = \get_comments( array( 'status' => 'any' ) );
+		$http            = array();
+		$capture_http    = static function ( $response, $args, $url ) use ( &$http ) {
+			$http[] = $url;
+			return new \WP_Error( 'offline' );
+		};
+		\add_filter( 'pre_http_request', $capture_http, 1, 3 );
+		$status = Reply_Import::status();
+		\remove_filter( 'pre_http_request', $capture_http, 1 );
+
+		$this->assertSame( 'legacy', $status['mode'] );
+		$this->assertFalse( $status['webmention_plugin_active'] );
+		$this->assertFalse( $status['server_support_confirmed'] );
+		$this->assertSame(
+			array(
+				'checked'          => 3,
+				'duplicate_groups' => 1,
+				'limited'          => false,
+			),
+			$status['local_duplicates']
+		);
+		$this->assertSame( $before_cron, \get_option( 'cron' ) );
+		$this->assertEquals( $before_comments, \get_comments( array( 'status' => 'any' ) ) );
+		$this->assertSame( $before_settings, \get_option( Rules::OPTION ) );
+		$this->assertSame( array(), $http );
+	}
 }
