@@ -84,17 +84,22 @@ class Router {
 	}
 
 	/**
-	 * Feed path: keep the source: elements consistent with what was actually sent.
+	 * Feed path: keep RSS2 source elements consistent with the preview.
 	 *
-	 * A post routed here by a rule never carries the chat format, so RSS Chat's
-	 * feed decoration would skip it and its item would lose source:markdown and
-	 * source:comments. Only posts it really did syndicate are covered.
+	 * Suppress the parent's decoration on ineligible posts, including native
+	 * Chat posts. On eligible posts, a saved receipt also enables decoration.
 	 *
 	 * @return void
 	 */
 	public static function open_for_feed() {
 		$post = \get_post();
-		if ( $post instanceof \WP_Post && '' !== self::delivery_id( $post->ID ) ) {
+		if ( ! $post instanceof \WP_Post ) {
+			return;
+		}
+
+		if ( ! Rules::is_eligible( $post ) ) {
+			self::engage( $post->ID, false );
+		} elseif ( '' !== self::delivery_id( $post->ID ) ) {
 			self::engage( $post->ID, true );
 		}
 	}
