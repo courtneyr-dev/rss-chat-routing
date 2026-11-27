@@ -15,7 +15,7 @@ function makeWp(state) {
       Fragment: 'Fragment',
       useEffect: (fn) => { effects.push(fn); fn(); },
     },
-    i18n: { __: (s) => s, sprintf: (s, v) => s.replace('%s', v) },
+    i18n: { __: (s) => s, sprintf: (s, v) => s.replace(/%[sd]/, v) },
     a11y: { speak: (msg) => spoken.push(msg) },
     components: { RadioControl: 'RadioControl' },
     editor: { PluginDocumentSettingPanel: 'Panel', PluginPrePublishPanel: 'PrePublish' },
@@ -23,6 +23,7 @@ function makeWp(state) {
       useSelect: (fn) => fn((store) => ({
         getCurrentPostType: () => state.postType,
         getEditedPostAttribute: (attr) => state[attr],
+        getCurrentPostAttribute: (attr) => state[attr],
       })),
       useDispatch: () => ({ editPost: (edit) => { state.lastEdit = edit; } }),
     },

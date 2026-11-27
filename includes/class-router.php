@@ -84,25 +84,68 @@ class Router {
 	}
 
 	/**
-	 * Feed path: keep the source: elements consistent with what was actually sent.
+	 * Feed path: keep RSS2 source elements consistent with the preview.
 	 *
-	 * A post routed here by a rule never carries the chat format, so RSS Chat's
-	 * feed decoration would skip it and its item would lose source:markdown and
-	 * source:comments. Only posts it really did syndicate are covered.
+	 * Suppress the parent's decoration on ineligible posts, including native
+	 * Chat posts. On eligible posts, a saved receipt also enables decoration.
 	 *
 	 * @return void
 	 */
 	public static function open_for_feed() {
 		$post = \get_post();
-
 		if ( ! $post instanceof \WP_Post ) {
 			return;
 		}
-		if ( '' === (string) \get_post_meta( $post->ID, '_rss_chat_id', true ) ) {
-			return;
+
+		if ( ! Rules::is_eligible( $post ) ) {
+			self::engage( $post->ID, false );
+		} elseif ( '' !== self::delivery_id( $post->ID ) ) {
+			self::engage( $post->ID, true );
+		}
+	}
+
+	/**
+	 * Read the parent’s saved remote item ID.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return string
+	 */
+	public static function delivery_id( $post_id ) {
+		return (string) \get_post_meta( $post_id, \RSS_Chat\Plugin::META_ID, true );
+	}
+
+	/**
+	 * Describe RSS2 provenance using saved public data. The parent renders
+	 * the markdown body only in the feed, where content filters can run.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return array|null
+	 */
+	public static function feed_provenance( $post ) {
+		if ( ! Rules::is_eligible( $post ) ) {
+			return null;
 		}
 
-		self::engage( $post->ID, true );
+		$has_receipt = '' !== self::delivery_id( $post->ID );
+		if ( ! $has_receipt && 'chat' !== \get_post_format( $post ) ) {
+			return null;
+		}
+
+		// Match the parent’s RSS2 reply count: approved replies, excluding likes.
+		$count = 0 === (int) $post->comment_count ? 0 : (int) \get_comments(
+			array(
+				'post_id' => $post->ID,
+				'type'    => 'comment',
+				'status'  => 'approve',
+				'count'   => true,
+			)
+		);
+
+		return array(
+			'origin'         => $has_receipt ? 'delivery' : 'chat',
+			'comments_count' => $count,
+			'comments_url'   => \get_post_comments_feed_link( $post->ID ),
+		);
 	}
 
 	/**

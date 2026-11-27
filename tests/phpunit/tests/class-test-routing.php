@@ -11,6 +11,7 @@ namespace RSS_Chat_Routing\Tests;
 use WP_UnitTestCase;
 use RSS_Chat\Plugin;
 use RSS_Chat_Routing\Editor;
+use RSS_Chat_Routing\Router;
 use RSS_Chat_Routing\Rules;
 
 /**
@@ -320,5 +321,56 @@ class Test_Routing extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'source:markdown', $output );
 		$this->assertStringContainsString( 'source:comments', $output );
+	}
+
+	/**
+	 * Protected posts omit feed provenance whether routed or native Chat.
+	 *
+	 * @dataProvider protected_feed_origins
+	 *
+	 * @param string $format  Saved post format.
+	 * @param string $receipt Saved remote ID, if previously sent.
+	 */
+	public function test_protected_post_omits_feed_provenance( $format, $receipt ): void {
+		$this->set_rules( 'none' );
+
+		$post_id = $this->publish( array( 'format' => $format ) );
+		if ( '' !== $receipt ) {
+			\update_post_meta( $post_id, Plugin::META_ID, $receipt );
+		}
+		\wp_update_post(
+			array(
+				'ID'            => $post_id,
+				'post_password' => 'fixture-only',
+			)
+		);
+
+		$GLOBALS['post'] = \get_post( $post_id ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		\setup_postdata( $GLOBALS['post'] );
+
+		$this->assertNull( Router::feed_provenance( $GLOBALS['post'] ) );
+
+		\ob_start();
+		\do_action( 'rss2_item' );
+		$output = (string) \ob_get_clean();
+
+		\wp_reset_postdata();
+
+		$this->assertStringNotContainsString( 'source:', $output );
+		$this->assertSame( $format, \get_post_format( $post_id ) );
+		$this->assertSame( $receipt, Router::delivery_id( $post_id ) );
+		$this->assertCount( 0, $this->newposts );
+	}
+
+	/**
+	 * Provide the feed's two sources of Chat decoration.
+	 *
+	 * @return array[]
+	 */
+	public static function protected_feed_origins(): array {
+		return array(
+			'delivery receipt' => array( 'aside', '4242' ),
+			'native Chat'      => array( 'chat', '' ),
+		);
 	}
 }

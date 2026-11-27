@@ -84,75 +84,110 @@
 	 * @param {string} override    '', 'include', or 'exclude'.
 	 * @param {string} format      Current format slug ('' = standard).
 	 * @param {Array}  kindIds     Selected kind term ids.
-	 * @return {Object} { send, message }
+	 * @return {string} Route forecast.
 	 */
 	function effective( override, format, kindIds ) {
 		if ( 'exclude' === override ) {
-			return {
-				send: false,
-				message: __( 'Excluded by this post’s override.', 'rss-chat-routing' ),
-			};
+			return __( 'Excluded by this post’s override.', 'rss-chat-routing' );
 		}
 		if ( 'include' === override ) {
-			return {
-				send: true,
-				message: __( 'Included by this post’s override.', 'rss-chat-routing' ),
-			};
+			return __( 'Included by this post’s override.', 'rss-chat-routing' );
 		}
 
 		if ( 'opt_out' === sendMode ) {
-			return {
-				send: true,
-				message: __( 'Included: the site sends every post you don’t exclude.', 'rss-chat-routing' ),
-			};
+			return __( 'Included: the site sends every post you don’t exclude.', 'rss-chat-routing' );
 		}
 
 		if ( 'opt_in' === sendMode ) {
-			return {
-				send: false,
-				message: __( 'Not sent: the site sends only posts you include.', 'rss-chat-routing' ),
-			};
+			return __( 'Not sent: the site sends only posts you include.', 'rss-chat-routing' );
 		}
 
 		if ( 'per_post' === sendMode ) {
-			return {
-				send: false,
-				message: __( 'Not sent yet: choose Include or Exclude for this post.', 'rss-chat-routing' ),
-			};
+			return __( 'Not sent yet: choose Include or Exclude for this post.', 'rss-chat-routing' );
 		}
 
 		var currentFormat = format || 'standard';
 		if ( config.defaultFormat && currentFormat === config.defaultFormat ) {
-			return {
-				send: true,
-				message: sprintf(
-					/* translators: %s: post format name. */
-					__( 'Included because the post format is %s.', 'rss-chat-routing' ),
-					config.defaultFormatLabel || config.defaultFormat
-				),
-			};
+			return sprintf(
+				/* translators: %s: post format name. */
+				__( 'Included because the post format is %s.', 'rss-chat-routing' ),
+				config.defaultFormatLabel || config.defaultFormat
+			);
 		}
 
 		if ( config.defaultKind && Array.isArray( kindIds ) ) {
 			for ( var i = 0; i < kindIds.length; i++ ) {
 				var kind = config.kindsById && config.kindsById[ kindIds[ i ] ];
 				if ( kind && kind.slug === config.defaultKind ) {
-					return {
-						send: true,
-						message: sprintf(
-							/* translators: %s: post kind name. */
-							__( 'Included because the post kind is %s.', 'rss-chat-routing' ),
-							kind.name
-						),
-					};
+					return sprintf(
+						/* translators: %s: post kind name. */
+						__( 'Included because the post kind is %s.', 'rss-chat-routing' ),
+						kind.name
+					);
 				}
 			}
 		}
 
-		return {
-			send: false,
-			message: __( 'Not included by the site default.', 'rss-chat-routing' ),
-		};
+		return __( 'Not included by the site default.', 'rss-chat-routing' );
+	}
+
+	function deliveryDetails( delivery ) {
+		if ( ! delivery ) {
+			return null;
+		}
+
+		var feed = delivery.feed;
+		return el(
+			wp.element.Fragment,
+			null,
+			el(
+				'p',
+				null,
+				delivery.remote_id
+					? sprintf(
+						/* translators: %s: recorded remote item ID. */
+						__( 'Recorded RSS Chat delivery ID: %s', 'rss-chat-routing' ),
+						delivery.remote_id
+					)
+					: __( 'No RSS Chat delivery ID recorded.', 'rss-chat-routing' )
+			),
+			el(
+				'details',
+				null,
+				el( 'summary', null, __( 'RSS2 feed provenance', 'rss-chat-routing' ) ),
+				feed
+					? el(
+						wp.element.Fragment,
+						null,
+						el(
+							'p',
+							null,
+							feed.origin === 'delivery'
+								? __( 'The saved delivery ID enables source fields for this post in RSS2.', 'rss-chat-routing' )
+								: __( 'The saved Chat post format enables source fields for this post in RSS2.', 'rss-chat-routing' )
+						),
+						el(
+							'dl',
+							null,
+							el( 'dt', null, el( 'code', null, 'source:markdown' ) ),
+							el( 'dd', null, __( 'RSS2 uses the rendered post body when it contains text.', 'rss-chat-routing' ) ),
+							el( 'dt', null, el( 'code', null, 'source:comments' ) ),
+							el(
+								'dd',
+								null,
+								sprintf(
+									/* translators: %d: number of approved replies. */
+									__( 'Approved replies: %d.', 'rss-chat-routing' ),
+									feed.comments_count
+								),
+								' ',
+								el( 'a', { href: feed.comments_url }, __( 'RSS2 comments feed', 'rss-chat-routing' ) )
+							)
+						)
+					)
+					: el( 'p', null, __( 'The saved post has no public RSS2 source fields.', 'rss-chat-routing' ) )
+			)
+		);
 	}
 
 	function Panel() {
@@ -172,18 +207,22 @@
 			return select( 'core/editor' ).getEditedPostAttribute( 'kind' ) || [];
 		}, [] );
 
+		var delivery = wp.data.useSelect( function ( select ) {
+			return select( 'core/editor' ).getCurrentPostAttribute( 'rss_chat_routing_delivery' );
+		}, [] );
+
 		var editPost = wp.data.useDispatch( 'core/editor' ).editPost;
 
 		var current = normalize( meta[ config.metaKey ] || '' );
-		var result = effective( current, format, kindIds );
+		var forecast = effective( current, format, kindIds );
 
 		// Announce the effective outcome when it changes, so screen reader
 		// users hear the consequence of a control they just used.
 		wp.element.useEffect( function () {
 			if ( wp.a11y && wp.a11y.speak ) {
-				wp.a11y.speak( result.message );
+				wp.a11y.speak( forecast );
 			}
-		}, [ result.message ] );
+		}, [ forecast ] );
 
 		if ( 'post' !== postType ) {
 			return null;
@@ -226,8 +265,13 @@
 					// The visible line doubles as the live status; aria-live
 					// is handled by wp.a11y.speak above, so plain text here.
 				},
-				( result.send ? '✓ ' : '— ' ) + result.message
+				sprintf(
+					/* translators: %s: the reason for the forecast. */
+					__( 'Route forecast when eligible: %s', 'rss-chat-routing' ),
+					forecast
+				)
 			),
+			deliveryDetails( delivery ),
 			el(
 				'p',
 				{ className: 'components-base-control__help' },

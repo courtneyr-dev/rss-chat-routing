@@ -22,6 +22,8 @@ class Editor {
 	 * @return void
 	 */
 	public static function init() {
+		\add_action( 'rest_api_init', array( __CLASS__, 'register_delivery_field' ) );
+		\add_filter( 'rest_prepare_post', array( __CLASS__, 'add_delivery_field' ), 10, 3 );
 		\add_action( 'enqueue_block_editor_assets', array( __CLASS__, 'enqueue' ) );
 		\add_filter( 'manage_post_posts_columns', array( __CLASS__, 'add_route_column' ) );
 		\add_action( 'manage_post_posts_custom_column', array( __CLASS__, 'render_route_column' ), 10, 2 );
@@ -54,7 +56,22 @@ class Editor {
 		}
 
 		$decision = Rules::decision( \get_post( $post_id ) );
-		$reasons  = array(
+
+		printf(
+			'<span class="rss-chat-route-value" data-route="%s">%s</span>',
+			\esc_attr( Rules::override( $post_id ) ),
+			\esc_html( self::reason_label( $decision['reason'] ) )
+		);
+	}
+
+	/**
+	 * Name the saved decision for both Posts views.
+	 *
+	 * @param string $reason Reason from the routing evaluator.
+	 * @return string
+	 */
+	private static function reason_label( $reason ) {
+		$reasons = array(
 			'ineligible'       => __( 'Post is ineligible', 'rss-chat-routing' ),
 			'override-include' => __( 'Included for this post', 'rss-chat-routing' ),
 			'override-exclude' => __( 'Excluded for this post', 'rss-chat-routing' ),
@@ -65,13 +82,120 @@ class Editor {
 			'format-default'   => __( 'Matches the site’s post format rule', 'rss-chat-routing' ),
 			'kind-default'     => __( 'Matches the site’s post kind rule', 'rss-chat-routing' ),
 		);
-		$label    = $reasons[ $decision['reason'] ] ?? __( 'No site rule matches', 'rss-chat-routing' );
+		return $reasons[ $reason ] ?? __( 'No site rule matches', 'rss-chat-routing' );
+	}
 
-		printf(
-			'<span class="rss-chat-route-value" data-route="%s">%s</span>',
-			\esc_attr( Rules::override( $post_id ) ),
-			\esc_html( $label )
+	/**
+	 * Add the read-only preview under Posts, even when RSS Chat is inactive.
+	 *
+	 * @return void
+	 */
+	public static function add_preview_page() {
+		\add_submenu_page(
+			'edit.php',
+			__( 'RSS Chat routing preview', 'rss-chat-routing' ),
+			__( 'RSS Chat routing preview', 'rss-chat-routing' ),
+			'edit_posts',
+			'rss-chat-routing-preview',
+			array( __CLASS__, 'render_preview_page' )
 		);
+	}
+
+	/**
+	 * Display a page of editable posts grouped by saved decision and reason.
+	 *
+	 * @return void
+	 */
+	public static function render_preview_page() {
+		if ( ! \current_user_can( 'edit_posts' ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Pagination only reads rows.
+		$page = isset( $_GET['paged'] ) && \is_string( $_GET['paged'] ) ? max( 1, \absint( $_GET['paged'] ) ) : 1;
+		$args = array(
+			'post_type'           => 'post',
+			'post_status'         => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+			'posts_per_page'      => 20,
+			'paged'               => $page,
+			'orderby'             => array(
+				'date' => 'DESC',
+				'ID'   => 'DESC',
+			),
+			'ignore_sticky_posts' => true,
+		);
+
+		if ( ! \current_user_can( 'edit_others_posts' ) ) {
+			$args['author'] = \get_current_user_id();
+		}
+
+		$query  = new \WP_Query( $args );
+		$groups = array(
+			'include' => array(),
+			'hold'    => array(),
+		);
+		foreach ( $query->posts as $post ) {
+			if ( ! \current_user_can( 'edit_post', $post->ID ) ) {
+				continue;
+			}
+			$decision = Rules::decision( $post );
+			$groups[ $decision['send'] ? 'include' : 'hold' ][ $decision['reason'] ][] = $post;
+		}
+
+		$labels = array(
+			'include' => __( 'Included by the saved rules', 'rss-chat-routing' ),
+			'hold'    => __( 'Held by the saved rules', 'rss-chat-routing' ),
+		);
+		?>
+		<div class="wrap">
+			<h1><?php \esc_html_e( 'RSS Chat routing preview', 'rss-chat-routing' ); ?></h1>
+			<p><?php \esc_html_e( 'These rules use each post’s saved settings and current publication status.', 'rss-chat-routing' ); ?></p>
+			<?php if ( ! is_parent_active() ) : ?>
+				<div class="notice notice-warning inline">
+					<p><?php \esc_html_e( 'RSS Chat is inactive. Delivery is unavailable.', 'rss-chat-routing' ); ?></p>
+				</div>
+			<?php elseif ( ! \in_array( 'post', \RSS_Chat\Plugin::supported_post_types(), true ) || ! \RSS_Chat\Plugin::is_connected() ) : ?>
+				<div class="notice notice-warning inline">
+					<p><?php \esc_html_e( 'Delivery requires a connected RSS Chat account and publishing enabled for Posts.', 'rss-chat-routing' ); ?></p>
+				</div>
+			<?php endif; ?>
+			<?php if ( empty( $groups['include'] ) && empty( $groups['hold'] ) ) : ?>
+				<p><?php \esc_html_e( 'You have no editable posts on this page.', 'rss-chat-routing' ); ?></p>
+			<?php endif; ?>
+			<?php foreach ( $labels as $group => $label ) : ?>
+				<?php
+				if ( empty( $groups[ $group ] ) ) {
+					continue; }
+				?>
+				<h2><?php echo \esc_html( $label ); ?></h2>
+				<?php foreach ( $groups[ $group ] as $reason => $posts ) : ?>
+					<h3><?php echo \esc_html( self::reason_label( $reason ) ); ?></h3>
+					<ul class="ul-disc">
+						<?php foreach ( $posts as $post ) : ?>
+							<?php $title = \get_the_title( $post ); ?>
+							<li><a href="<?php echo \esc_url( \get_edit_post_link( $post ) ); ?>"><?php echo \esc_html( '' === $title ? __( '(no title)', 'rss-chat-routing' ) : $title ); ?></a></li>
+						<?php endforeach; ?>
+					</ul>
+				<?php endforeach; ?>
+			<?php endforeach; ?>
+			<?php if ( $query->max_num_pages > 1 ) : ?>
+				<nav class="tablenav" aria-label="<?php \esc_attr_e( 'RSS Chat preview pages', 'rss-chat-routing' ); ?>">
+					<?php
+					echo \wp_kses_post(
+						\paginate_links(
+							array(
+								'base'    => \admin_url( 'edit.php?page=rss-chat-routing-preview&paged=%#%' ),
+								'current' => $page,
+								'total'   => $query->max_num_pages,
+								'type'    => 'list',
+							)
+						)
+					);
+					?>
+				</nav>
+			<?php endif; ?>
+		</div>
+		<?php
 	}
 
 	/**
@@ -145,6 +269,65 @@ class Editor {
 		} elseif ( \in_array( $route, array( 'include', 'exclude' ), true ) ) {
 			\update_post_meta( $post_id, Rules::META_KEY, $route );
 		}
+	}
+
+	/**
+	 * Expose saved delivery data in the editor’s existing post response.
+	 *
+	 * @return void
+	 */
+	public static function register_delivery_field() {
+		\register_rest_field(
+			'post',
+			'rss_chat_routing_delivery',
+			array(
+				'schema' => array(
+					'type'       => array( 'object', 'null' ),
+					'context'    => array( 'edit' ),
+					'readonly'   => true,
+					'properties' => array(
+						'remote_id' => array( 'type' => 'string' ),
+						'feed'      => array(
+							'type'       => array( 'object', 'null' ),
+							'properties' => array(
+								'origin'         => array(
+									'type' => 'string',
+									'enum' => array( 'delivery', 'chat' ),
+								),
+								'comments_count' => array( 'type' => 'integer' ),
+								'comments_url'   => array( 'type' => 'string' ),
+							),
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Read delivery details for an editable post.
+	 *
+	 * @param \WP_REST_Response $response Prepared post response.
+	 * @param \WP_Post          $post     The saved post, even when _fields omits its ID.
+	 * @param \WP_REST_Request  $request  Original request.
+	 * @return \WP_REST_Response
+	 */
+	public static function add_delivery_field( $response, $post, $request ) {
+		$field = 'rss_chat_routing_delivery';
+		if ( 'edit' !== $request['context']
+			|| 'HEAD' === $request->get_method()
+			|| ( isset( $request['_fields'] ) && ! \rest_is_field_included( $field, \wp_parse_list( $request['_fields'] ) ) )
+			|| ! \current_user_can( 'edit_post', $post->ID ) ) {
+			return $response;
+		}
+
+		$data           = $response->get_data();
+		$data[ $field ] = array(
+			'remote_id' => Router::delivery_id( $post->ID ),
+			'feed'      => Router::feed_provenance( $post ),
+		);
+		$response->set_data( $data );
+		return $response;
 	}
 
 	/**

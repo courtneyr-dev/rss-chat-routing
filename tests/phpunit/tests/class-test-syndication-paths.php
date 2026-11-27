@@ -412,4 +412,79 @@ class Test_Syndication_Paths extends WP_UnitTestCase {
 		$this->assertCount( 1, $this->payloads, 'no second /newpost' );
 		$this->assertSame( 4242, (int) \get_post_meta( $post_id, Plugin::META_ID, true ), 'mapping intact' );
 	}
+
+	/**
+	 * The editor reads the saved receipt and public feed provenance after a revision restore.
+	 */
+	public function test_read_only_delivery_field_survives_rule_change_and_revision_restore() {
+		$user = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		\wp_set_current_user( $user );
+		\update_option( Rules::OPTION, array( 'default_format' => 'status' ) );
+		$post_id = $this->publish( array( 'format' => 'status' ) );
+		$older   = (int) \wp_save_post_revision( $post_id );
+		if ( ! $older ) {
+			$older = (int) \array_key_first( \wp_get_post_revisions( $post_id ) );
+		}
+		$this->assertGreaterThan( 0, $older );
+		$this->assertCount( 1, $this->payloads );
+		$this->assertSame( 'format-default', Rules::decision( \get_post( $post_id ) )['reason'] );
+
+		\wp_update_post(
+			array(
+				'ID'           => $post_id,
+				'post_content' => 'New body copy.',
+			)
+		);
+		\update_option( Rules::OPTION, array( 'send_mode' => 'opt_in' ) );
+		$this->assertSame( $post_id, \wp_restore_post_revision( $older ) );
+		$this->assertSame( 'Body copy.', \get_post_field( 'post_content', $post_id ) );
+		$this->assertSame( 'opt-in-default', Rules::decision( \get_post( $post_id ) )['reason'] );
+
+		$http         = array();
+		$capture_http = static function ( $response, $args, $url ) use ( &$http ) {
+			$http[] = $url;
+			return new \WP_Error( 'offline' );
+		};
+		\add_filter( 'pre_http_request', $capture_http, 1, 3 );
+		$cron = \get_option( 'cron' );
+		$meta = \get_post_meta( $post_id );
+
+		$field   = 'rss_chat_routing_delivery';
+		$request = new \WP_REST_Request( 'GET', '/wp/v2/posts/' . $post_id );
+		$request->set_query_params(
+			array(
+				'context' => 'edit',
+				'_fields' => $field,
+			)
+		);
+		$response = \rest_get_server()->dispatch( $request );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame(
+			array(
+				'remote_id' => '4242',
+				'feed'      => array(
+					'origin'         => 'delivery',
+					'comments_count' => 0,
+					'comments_url'   => \get_post_comments_feed_link( $post_id ),
+				),
+			),
+			$response->get_data()[ $field ]
+		);
+		$this->assertSame( $cron, \get_option( 'cron' ) );
+		$this->assertSame( $meta, \get_post_meta( $post_id ) );
+		$this->assertSame( array(), $http );
+		$this->assertCount( 1, $this->payloads );
+		\remove_filter( 'pre_http_request', $capture_http, 1 );
+
+		$write = new \WP_REST_Request( 'POST', '/wp/v2/posts/' . $post_id );
+		$write->set_body_params( array( $field => array( 'remote_id' => 'forged' ) ) );
+		$this->assertSame( 200, \rest_get_server()->dispatch( $write )->get_status() );
+		$this->assertSame( '4242', \get_post_meta( $post_id, Plugin::META_ID, true ) );
+		$this->assertCount( 1, $this->payloads );
+
+		\wp_set_current_user( 0 );
+		$this->assertSame( 401, \rest_get_server()->dispatch( $request )->get_status() );
+		$request->set_param( 'context', 'view' );
+		$this->assertArrayNotHasKey( $field, \rest_get_server()->dispatch( $request )->get_data() );
+	}
 }
